@@ -13,4 +13,9 @@ class LocaleNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void reset(Locale locale) {
+    _locale = locale;
+    notifyListeners();
+  }
 }

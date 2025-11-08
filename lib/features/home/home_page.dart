@@ -183,16 +183,22 @@ class _HomePageState extends State<HomePage> {
           children: [
             Container(
               key: _searchKey,
-              child: SearchBarX(
-                controller: _searchController,
-                onChanged: (value) => scope.searchNotifier.updateQuery(value),
-                onSubmitted: (value) {
-                  scope.searchNotifier.updateQuery(value);
-                  scope.searchNotifier.commitQuery(value);
-                  Navigator.of(context).pushNamed('/search');
+              child: AnimatedBuilder(
+                animation: scope.searchNotifier,
+                builder: (context, _) {
+                  return SearchBarX(
+                    controller: _searchController,
+                    onChanged: (value) => scope.searchNotifier.updateQuery(value),
+                    onSubmitted: (value) {
+                      scope.searchNotifier.updateQuery(value);
+                      scope.searchNotifier.commitQuery(value);
+                      Navigator.of(context).pushNamed('/search');
+                    },
+                    onFilters: () => Navigator.of(context).pushNamed('/catalog'),
+                    suggestionsBuilder: (query) => scope.searchNotifier.suggestions(query),
+                    isLoading: scope.searchNotifier.isLoading,
+                  );
                 },
-                onFilters: () => Navigator.of(context).pushNamed('/catalog'),
-                suggestionsBuilder: (query) => scope.searchNotifier.suggestions(query),
               ),
             ),
             const SizedBox(height: 20),

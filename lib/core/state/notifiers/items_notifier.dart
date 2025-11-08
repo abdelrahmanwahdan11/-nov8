@@ -87,4 +87,14 @@ class ItemsNotifier extends ChangeNotifier {
       return List<MyItem>.from(MockData.myItems);
     }
   }
+
+  void reset() {
+    _myItems
+      ..clear()
+      ..addAll(MockData.myItems);
+    _offers
+      ..clear()
+      ..addAll(MockData.offers);
+    notifyListeners();
+  }
 }

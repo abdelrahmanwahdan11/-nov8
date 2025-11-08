@@ -4,6 +4,7 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/state/app_scope.dart';
 import '../../core/widgets/property_card.dart';
 import '../../core/widgets/search_bar_x.dart';
+import '../../core/widgets/skeleton.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -50,6 +51,7 @@ class _SearchPageState extends State<SearchPage> {
                   },
                   onFilters: () => Navigator.of(context).pushNamed('/catalog'),
                   suggestionsBuilder: notifier.suggestions,
+                  isLoading: notifier.isLoading,
                 ),
               ),
               if (notifier.recent.isNotEmpty)
@@ -83,26 +85,33 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                 ),
               Expanded(
-                child: notifier.results.isEmpty
-                    ? Center(child: Text(l10n.t('no_results')))
-                    : ListView.builder(
+                child: notifier.isLoading
+                    ? ListView.separated(
                         padding: const EdgeInsets.all(24),
-                        itemCount: notifier.results.length,
-                        itemBuilder: (context, index) {
-                          final property = notifier.results[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: PropertyCard(
-                              property: property,
-                              onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
-                              onFavorite: () => scope.favoritesNotifier.toggle(property.id),
-                              onCompare: () => scope.compareNotifier.toggle(property.id),
-                              isFavorite: scope.favoritesNotifier.isFavorite(property.id),
-                              isCompared: scope.compareNotifier.contains(property.id),
-                            ),
-                          );
-                        },
-                      ),
+                        itemCount: 4,
+                        itemBuilder: (context, index) => const SkeletonListCard(),
+                        separatorBuilder: (_, __) => const SizedBox(height: 20),
+                      )
+                    : notifier.results.isEmpty
+                        ? Center(child: Text(l10n.t('no_results')))
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(24),
+                            itemCount: notifier.results.length,
+                            itemBuilder: (context, index) {
+                              final property = notifier.results[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: PropertyCard(
+                                  property: property,
+                                  onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                                  onFavorite: () => scope.favoritesNotifier.toggle(property.id),
+                                  onCompare: () => scope.compareNotifier.toggle(property.id),
+                                  isFavorite: scope.favoritesNotifier.isFavorite(property.id),
+                                  isCompared: scope.compareNotifier.contains(property.id),
+                                ),
+                              );
+                            },
+                          ),
               ),
             ],
           );

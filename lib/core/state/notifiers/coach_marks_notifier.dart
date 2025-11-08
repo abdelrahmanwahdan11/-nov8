@@ -13,4 +13,9 @@ class CoachMarksNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void reset() {
+    _isFirstRun = true;
+    notifyListeners();
+  }
 }

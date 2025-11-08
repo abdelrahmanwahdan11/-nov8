@@ -57,7 +57,7 @@ class CatalogNotifier extends ChangeNotifier {
     _visible = _all.take(_pageSize).toList();
   }
 
-  late final List<Property> _all;
+  late List<Property> _all;
   late List<Property> _visible;
   CatalogFilters filters = CatalogFilters();
   int _currentPage = 1;
@@ -138,5 +138,14 @@ class CatalogNotifier extends ChangeNotifier {
     final filtered = _filtered;
     final endIndex = (_currentPage * _pageSize).clamp(0, filtered.length);
     _visible = filtered.take(endIndex).toList();
+  }
+
+  void reset() {
+    _all = List<Property>.from(MockData.properties);
+    filters = CatalogFilters();
+    listMode = true;
+    _isLoading = false;
+    _applyPage(1);
+    notifyListeners();
   }
 }

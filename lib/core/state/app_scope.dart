@@ -172,6 +172,19 @@ class AppScopeData extends ChangeNotifier {
     _listeners.add(() => listenable.removeListener(listener));
   }
 
+  void resetState() {
+    themeNotifier.reset(darkMode: true, accent: const Color(0xFFFF8A00));
+    localeNotifier.reset(const Locale('en'));
+    favoritesNotifier.clear();
+    compareNotifier.clear();
+    catalogNotifier.reset();
+    bookingNotifier.reset();
+    itemsNotifier.reset();
+    searchNotifier.reset();
+    coachMarksNotifier.reset();
+    authNotifier.logout();
+  }
+
   @override
   void dispose() {
     for (final remove in _listeners) {

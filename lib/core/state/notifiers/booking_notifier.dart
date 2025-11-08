@@ -20,4 +20,10 @@ class BookingNotifier extends ChangeNotifier {
     _selectedSlot = slot;
     notifyListeners();
   }
+
+  void reset() {
+    _selectedDate = DateTime.now();
+    _selectedSlot = null;
+    notifyListeners();
+  }
 }

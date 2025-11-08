@@ -11,6 +11,7 @@ class SearchBarX extends StatefulWidget {
     required this.onSubmitted,
     required this.onFilters,
     required this.suggestionsBuilder,
+    this.isLoading = false,
   });
 
   final TextEditingController controller;
@@ -18,6 +19,7 @@ class SearchBarX extends StatefulWidget {
   final ValueChanged<String> onSubmitted;
   final VoidCallback onFilters;
   final List<String> Function(String text) suggestionsBuilder;
+  final bool isLoading;
 
   @override
   State<SearchBarX> createState() => _SearchBarXState();
@@ -63,12 +65,26 @@ class _SearchBarXState extends State<SearchBarX> {
                 decoration: InputDecoration(
                   hintText: l10n.t('search_hint'),
                   prefixIcon: const Icon(IconlyLight.search),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      widget.controller.clear();
-                      widget.onChanged('');
-                    },
+                  suffixIcon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: widget.isLoading
+                        ? Padding(
+                            key: const ValueKey('loading'),
+                            padding: const EdgeInsets.all(12),
+                            child: const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            key: const ValueKey('clear'),
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              widget.controller.clear();
+                              widget.onChanged('');
+                            },
+                          ),
                   ),
                 ),
                 onChanged: widget.onChanged,

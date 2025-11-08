@@ -29,4 +29,10 @@ class ThemeNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void reset({required bool darkMode, required Color accent}) {
+    _isDarkMode = darkMode;
+    accentColor = accent;
+    notifyListeners();
+  }
 }
