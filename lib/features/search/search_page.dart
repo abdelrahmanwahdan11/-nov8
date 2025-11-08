@@ -52,6 +52,36 @@ class _SearchPageState extends State<SearchPage> {
                   suggestionsBuilder: notifier.suggestions,
                 ),
               ),
+              if (notifier.recent.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(l10n.t('recent_searches'), style: Theme.of(context).textTheme.labelLarge),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: notifier.recent
+                              .map(
+                                (recent) => ActionChip(
+                                  label: Text(recent),
+                                  onPressed: () {
+                                    _controller.text = recent;
+                                    notifier.updateQuery(recent);
+                                    notifier.commitQuery(recent);
+                                  },
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Expanded(
                 child: notifier.results.isEmpty
                     ? Center(child: Text(l10n.t('no_results')))

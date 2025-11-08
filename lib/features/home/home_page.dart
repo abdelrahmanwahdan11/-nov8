@@ -34,14 +34,35 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final scope = AppScope.of(context);
       if (scope.coachMarksNotifier.shouldShow) {
+        final l10n = AppLocalizations.of(context);
         final overlay = CoachMarksOverlay(
           context: context,
           steps: [
-            CoachMarkStep(key: _searchKey, title: AppLocalizations.of(context).t('tutorial_1'), message: AppLocalizations.of(context).t('tutorial_1_hint')),
-            CoachMarkStep(key: _heroKey, title: AppLocalizations.of(context).t('tutorial_2'), message: AppLocalizations.of(context).t('tutorial_2_hint')),
-            CoachMarkStep(key: _chipsKey, title: AppLocalizations.of(context).t('tutorial_3'), message: AppLocalizations.of(context).t('tutorial_3_hint')),
-            CoachMarkStep(key: _compareKey, title: AppLocalizations.of(context).t('compare'), message: AppLocalizations.of(context).t('coach_compare_hint')),
-            CoachMarkStep(key: _bookKey, title: AppLocalizations.of(context).t('tutorial_4'), message: AppLocalizations.of(context).t('tutorial_4_hint')),
+            CoachMarkStep(
+              key: _searchKey,
+              title: l10n.t('tutorial_1'),
+              message: l10n.t('tutorial_1_hint'),
+            ),
+            CoachMarkStep(
+              key: _heroKey,
+              title: l10n.t('tutorial_2'),
+              message: l10n.t('tutorial_2_hint'),
+            ),
+            CoachMarkStep(
+              key: _chipsKey,
+              title: l10n.t('tutorial_3'),
+              message: l10n.t('tutorial_3_hint'),
+            ),
+            CoachMarkStep(
+              key: _compareKey,
+              title: l10n.t('compare'),
+              message: l10n.t('coach_compare_hint'),
+            ),
+            CoachMarkStep(
+              key: _bookKey,
+              title: l10n.t('tutorial_4'),
+              message: l10n.t('tutorial_4_hint'),
+            ),
           ],
           onComplete: () {
             scope.coachMarksNotifier.complete();
@@ -80,6 +101,12 @@ class _HomePageState extends State<HomePage> {
     final l10n = AppLocalizations.of(context);
     final properties = _filteredProperties();
     final heroProperty = properties.isNotEmpty ? properties.first : MockData.properties.first;
+    final modernList = MockData.properties.where((p) => p.tags.contains('modern')).toList();
+    final cityList = MockData.properties
+        .where((p) => p.tags.contains('cityscape') || p.tags.contains('skyline'))
+        .toList();
+    final curatedModern = modernList.isEmpty ? MockData.properties : modernList;
+    final curatedCity = cityList.isEmpty ? MockData.properties : cityList;
 
     return Scaffold(
       appBar: AppBar(
@@ -103,10 +130,13 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          final rootContext = context;
           showModalBottomSheet(
             context: context,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-            builder: (context) {
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (sheetContext) {
               return Padding(
                 padding: const EdgeInsets.all(24),
                 child: Wrap(
@@ -115,17 +145,26 @@ class _HomePageState extends State<HomePage> {
                     ListTile(
                       leading: const Icon(IconlyBold.heart),
                       title: Text(l10n.t('favorites')),
-                      onTap: () => Navigator.of(context).pushNamed('/favorites'),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Navigator.of(rootContext).pushNamed('/favorites');
+                      },
                     ),
                     ListTile(
                       leading: const Icon(IconlyBold.folder),
                       title: Text(l10n.t('catalog')),
-                      onTap: () => Navigator.of(context).pushNamed('/catalog'),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Navigator.of(rootContext).pushNamed('/catalog');
+                      },
                     ),
                     ListTile(
                       leading: const Icon(IconlyBold.chart),
                       title: Text(l10n.t('compare')),
-                      onTap: () => Navigator.of(context).pushNamed('/compare'),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Navigator.of(rootContext).pushNamed('/compare');
+                      },
                     ),
                   ],
                 ),
@@ -137,7 +176,7 @@ class _HomePageState extends State<HomePage> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await Future<void>.delayed(const Duration(milliseconds: 600));
+          await scope.catalogNotifier.refresh();
         },
         child: ListView(
           padding: const EdgeInsets.all(24),
@@ -148,6 +187,7 @@ class _HomePageState extends State<HomePage> {
                 controller: _searchController,
                 onChanged: (value) => scope.searchNotifier.updateQuery(value),
                 onSubmitted: (value) {
+                  scope.searchNotifier.updateQuery(value);
                   scope.searchNotifier.commitQuery(value);
                   Navigator.of(context).pushNamed('/search');
                 },
@@ -164,9 +204,15 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 20),
             Container(
               key: _heroKey,
-              child: SpinGallery3D(
-                frames: heroProperty.spinFrames,
-                onTap: () => Navigator.of(context).pushNamed('/details', arguments: heroProperty.id),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: SpinGallery3D(
+                  key: ValueKey(heroProperty.id),
+                  frames: heroProperty.spinFrames,
+                  heroTag: heroProperty.id,
+                  onTap: () => Navigator.of(context)
+                      .pushNamed('/details', arguments: heroProperty.id),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -176,8 +222,10 @@ class _HomePageState extends State<HomePage> {
               height: 320,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: curatedModern.length,
                 itemBuilder: (context, index) {
-                  final property = MockData.properties[index % MockData.properties.length];
+                  final property = curatedModern[index];
                   return SizedBox(
                     width: 280,
                     child: PropertyCard(
@@ -191,7 +239,6 @@ class _HomePageState extends State<HomePage> {
                   );
                 },
                 separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemCount: MockData.properties.length,
               ),
             ),
             const SizedBox(height: 24),
@@ -201,18 +248,55 @@ class _HomePageState extends State<HomePage> {
               height: 180,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: curatedCity.length,
                 itemBuilder: (context, index) {
-                  final property = MockData.properties.reversed.toList()[index % MockData.properties.length];
+                  final property = curatedCity[index];
                   return GestureDetector(
-                    onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                    onTap: () => Navigator.of(context)
+                        .pushNamed('/details', arguments: property.id),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
-                      child: Image.network(property.images.first, width: 220, height: 180, fit: BoxFit.cover),
+                      child: Stack(
+                        children: [
+                          Image.network(
+                            property.images.first,
+                            width: 220,
+                            height: 180,
+                            fit: BoxFit.cover,
+                          ),
+                          Positioned(
+                            left: 12,
+                            right: 12,
+                            bottom: 12,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  property.title,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(color: Colors.white),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemCount: MockData.properties.length,
               ),
             ),
             const SizedBox(height: 24),

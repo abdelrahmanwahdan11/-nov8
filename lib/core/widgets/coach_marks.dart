@@ -31,7 +31,8 @@ class CoachMarksOverlay {
         onSkip: dismiss,
       );
     });
-    Overlay.of(context, debugRequiredFor: context.widget)?.insert(_entry!);
+    final overlay = Overlay.of(context);
+    overlay?.insert(_entry!);
   }
 
   bool _completed = false;

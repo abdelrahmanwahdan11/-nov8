@@ -16,6 +16,9 @@ class SearchNotifier extends ChangeNotifier {
   List<String> get recent => List.unmodifiable(_recent);
 
   List<String> suggestions(String input) {
+    if (input.isEmpty) {
+      return List<String>.from(_recent.take(6));
+    }
     final normalized = input.toLowerCase();
     final source = <String>{
       for (final property in MockData.properties) ...{
@@ -25,10 +28,22 @@ class SearchNotifier extends ChangeNotifier {
         ...property.tags,
       },
     };
-    return source
-        .where((element) => element.toLowerCase().contains(normalized))
-        .take(8)
-        .toList();
+    final combined = <String>[
+      ..._recent.where((element) => element.toLowerCase().contains(normalized)),
+      ...source.where((element) => element.toLowerCase().contains(normalized)),
+    ];
+    final seen = <String>{};
+    final results = <String>[];
+    for (final value in combined) {
+      final key = value.toLowerCase();
+      if (seen.add(key)) {
+        results.add(value);
+      }
+      if (results.length >= 8) {
+        break;
+      }
+    }
+    return results;
   }
 
   void updateQuery(String value) {

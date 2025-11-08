@@ -92,7 +92,8 @@ class _SpinGallery3DState extends State<SpinGallery3D> with SingleTickerProvider
             ),
           );
 
-    final tracker = ValueNotifier<double>(0);
+    final totalFrames = _frameCount == 0 ? 1 : _frameCount;
+    final currentFrame = _frameCount == 0 ? 1 : (_index + 1);
 
     final content = Stack(
       fit: StackFit.expand,
@@ -113,14 +114,9 @@ class _SpinGallery3DState extends State<SpinGallery3D> with SingleTickerProvider
                 children: [
                   const Icon(Icons.rotate_90_degrees_ccw, color: Colors.white, size: 18),
                   const SizedBox(width: 8),
-                  AnimatedBuilder(
-                    animation: tracker,
-                    builder: (context, _) {
-                      return Text(
-                        '${_index + 1}/$_frameCount',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.white),
-                      );
-                    },
+                  Text(
+                    '$currentFrame/$totalFrames',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.white),
                   ),
                 ],
               ),
@@ -133,20 +129,22 @@ class _SpinGallery3DState extends State<SpinGallery3D> with SingleTickerProvider
     return GestureDetector(
       onTap: widget.onTap,
       onPanUpdate: (details) {
-        tracker.value = details.localPosition.dx;
         _applyDelta(details.delta.dx.round());
       },
       onPanEnd: (details) {
         _startInertia(details.velocity.pixelsPerSecond.dx);
       },
-      child: widget.heroTag != null
-          ? Hero(tag: widget.heroTag!, child: content)
-          : AnimatedScale(
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutBack,
-              scale: 1,
-              child: content,
-            ),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.94, end: 1),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutBack,
+        builder: (context, scale, child) {
+          return Transform.scale(scale: scale, child: child);
+        },
+        child: widget.heroTag != null
+            ? Hero(tag: widget.heroTag!, child: content)
+            : content,
+      ),
     );
   }
 }

@@ -39,9 +39,10 @@ class DetailsPage extends StatelessWidget {
         children: [
           SizedBox(
             height: 320,
-            child: GestureDetector(
+            child: SpinGallery3D(
+              frames: property.spinFrames,
+              heroTag: property.id,
               onTap: () => _openGallery(context, property.images),
-              child: SpinGallery3D(frames: property.spinFrames),
             ),
           ),
           const SizedBox(height: 24),

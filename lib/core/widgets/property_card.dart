@@ -37,7 +37,7 @@ class PropertyCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: theme.colorScheme.primary.withOpacity(0.05),
+              color: theme.colorScheme.primary.withOpacity(0.08),
               blurRadius: 24,
               offset: const Offset(0, 14),
             ),
@@ -90,33 +90,44 @@ class PropertyCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.place_rounded, size: 16, color: theme.colorScheme.primary.withOpacity(0.6)),
+                      Icon(
+                        Icons.place_rounded,
+                        size: 16,
+                        color: theme.colorScheme.primary.withOpacity(0.6),
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           property.city,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  _FacilityChip(label: '${property.facilities.beds} ${l10n.t('beds_short')}'),
-                  _FacilityChip(label: '${property.facilities.baths} ${l10n.t('baths_short')}'),
-                  _FacilityChip(label: '${property.area} m²'),
-                ],
-              ),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      _FacilityChip(label: '${property.facilities.beds} ${l10n.t('beds_short')}'),
+                      _FacilityChip(label: '${property.facilities.baths} ${l10n.t('baths_short')}'),
+                      _FacilityChip(label: '${property.area} m²'),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           AppFormatters.currency(property.price),
-                          style: theme.textTheme.titleLarge?.copyWith(color: accent, fontWeight: FontWeight.w700),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: accent,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       if (property.mortgageEligible)
@@ -126,18 +137,22 @@ class PropertyCard extends StatelessWidget {
                             color: accent.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: Text(l10n.t('mortgage_badge'), style: theme.textTheme.labelMedium?.copyWith(color: accent)),
+                          child: Text(
+                            l10n.t('mortgage_badge'),
+                            style: theme.textTheme.labelMedium?.copyWith(color: accent),
+                          ),
                         ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: property.tags
-                    .map(
-                      (tag) => Chip(
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: property.tags
+                        .map(
+                          (tag) => Chip(
                             label: Text(tag),
-                            backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.2),
+                            backgroundColor: theme.colorScheme.primary.withOpacity(0.08),
                           ),
                         )
                         .toList(),

@@ -83,26 +83,29 @@ class _SearchBarXState extends State<SearchBarX> {
             ),
           ],
         ),
-        if (_focusNode.hasFocus && widget.controller.text.isNotEmpty)
+        if (_focusNode.hasFocus && _suggestions.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Card(
               elevation: 4,
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemBuilder: (context, index) {
-                  final suggestion = _suggestions[index];
-                  return ListTile(
-                    title: Text(suggestion),
-                    onTap: () {
-                      widget.controller.text = suggestion;
-                      widget.onSubmitted(suggestion);
-                      _focusNode.unfocus();
-                    },
-                  );
-                },
-                separatorBuilder: (_, __) => const Divider(height: 0),
-                itemCount: _suggestions.length,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemBuilder: (context, index) {
+                    final suggestion = _suggestions[index];
+                    return ListTile(
+                      title: Text(suggestion),
+                      onTap: () {
+                        widget.controller.text = suggestion;
+                        widget.onSubmitted(suggestion);
+                        _focusNode.unfocus();
+                      },
+                    );
+                  },
+                  separatorBuilder: (_, __) => const Divider(height: 0),
+                  itemCount: _suggestions.length,
+                ),
               ),
             ),
           ),
