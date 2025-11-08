@@ -4,7 +4,6 @@ import 'package:iconly/iconly.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/state/app_scope.dart';
 import '../../core/state/notifiers/search_notifier.dart';
-import '../../core/widgets/coach_marks.dart';
 import '../../core/widgets/compare_tray.dart';
 import '../../core/widgets/property_card.dart';
 import '../../core/widgets/search_bar_x.dart';
@@ -22,66 +21,11 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
-  final GlobalKey _searchKey = GlobalKey();
-  final GlobalKey _heroKey = GlobalKey();
-  final GlobalKey _chipsKey = GlobalKey();
-  final GlobalKey _compareKey = GlobalKey();
-  final GlobalKey _bookKey = GlobalKey();
-
   String _selectedChip = 'all';
-  CoachMarksOverlay? _coachOverlay;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final scope = AppScope.of(context);
-      if (scope.coachMarksNotifier.shouldShow) {
-        final l10n = AppLocalizations.of(context);
-        _coachOverlay?.dismiss();
-        _coachOverlay = CoachMarksOverlay(
-          context: context,
-          steps: [
-            CoachMarkStep(
-              key: _searchKey,
-              title: l10n.t('tutorial_1'),
-              message: l10n.t('tutorial_1_hint'),
-            ),
-            CoachMarkStep(
-              key: _heroKey,
-              title: l10n.t('tutorial_2'),
-              message: l10n.t('tutorial_2_hint'),
-            ),
-            CoachMarkStep(
-              key: _chipsKey,
-              title: l10n.t('tutorial_3'),
-              message: l10n.t('tutorial_3_hint'),
-            ),
-            CoachMarkStep(
-              key: _compareKey,
-              title: l10n.t('compare'),
-              message: l10n.t('coach_compare_hint'),
-            ),
-            CoachMarkStep(
-              key: _bookKey,
-              title: l10n.t('tutorial_4'),
-              message: l10n.t('tutorial_4_hint'),
-            ),
-          ],
-          onComplete: () {
-            scope.coachMarksNotifier.complete();
-            _coachOverlay = null;
-          },
-        )
-          ..show();
-      }
-    });
-  }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _coachOverlay?.dismiss();
     super.dispose();
   }
 
@@ -223,8 +167,18 @@ class _HomePageState extends State<HomePage> {
           final catalog = scope.catalogNotifier;
           final catalogAll = catalog.allProperties;
           final fallbackAll = catalogAll.isNotEmpty ? catalogAll : MockData.properties;
+          if (fallbackAll.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(l10n.t('no_results'), style: Theme.of(context).textTheme.bodyLarge),
+              ),
+            );
+          }
+
           final primaryList = catalog.visible.isNotEmpty ? catalog.visible : fallbackAll;
           final filtered = _filteredProperties(primaryList);
+          final recommended = (filtered.isEmpty ? fallbackAll : filtered).take(4).toList();
           final heroProperty = filtered.isNotEmpty ? filtered.first : fallbackAll.first;
           final modernCandidates = fallbackAll.where((p) => p.tags.contains('modern')).toList();
           final modernSource = modernCandidates.isEmpty ? fallbackAll : modernCandidates;
@@ -241,7 +195,6 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(24),
               children: [
             Container(
-              key: _searchKey,
               child: AnimatedBuilder(
                 animation: scope.searchNotifier,
                 builder: (context, _) {
@@ -319,13 +272,11 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 20),
             _FeatureChips(
-              key: _chipsKey,
               selected: _selectedChip,
               onChanged: (value) => setState(() => _selectedChip = value),
             ),
             const SizedBox(height: 20),
             Container(
-              key: _heroKey,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 child: SpinGallery3D(
@@ -337,6 +288,28 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 24),
+            Text(l10n.t('section_recommended'), style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            if (recommended.isEmpty)
+              Text(
+                l10n.t('no_results'),
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              ...recommended.map(
+                (property) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: PropertyCard(
+                    property: property,
+                    onTap: () => _openProperty(scope, property.id),
+                    onFavorite: () => scope.favoritesNotifier.toggle(property.id),
+                    onCompare: () => scope.compareNotifier.toggle(property.id),
+                    isFavorite: scope.favoritesNotifier.isFavorite(property.id),
+                    isCompared: scope.compareNotifier.contains(property.id),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
             Text(l10n.t('section_modern'), style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             SizedBox(
@@ -421,7 +394,6 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              key: _bookKey,
               onPressed: () => Navigator.of(context).pushNamed('/booking'),
               icon: const Icon(Icons.calendar_month),
               label: Text(l10n.t('book_now')),
@@ -449,7 +421,6 @@ class _HomePageState extends State<HomePage> {
               .map((property) => CompareTrayItem(id: property.id, label: property.title))
               .toList();
           return CompareTray(
-            key: _compareKey,
             items: compareItems,
             onRemove: (id) => scope.compareNotifier.remove(id),
             onOpen: () => Navigator.of(context).pushNamed('/compare'),

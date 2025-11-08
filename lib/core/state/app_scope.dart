@@ -5,7 +5,6 @@ import '../../data/services_local/preferences_service.dart';
 import 'notifiers/auth_notifier.dart';
 import 'notifiers/booking_notifier.dart';
 import 'notifiers/catalog_notifier.dart';
-import 'notifiers/coach_marks_notifier.dart';
 import 'notifiers/compare_notifier.dart';
 import 'notifiers/favorites_notifier.dart';
 import 'notifiers/items_notifier.dart';
@@ -61,7 +60,6 @@ class _AppScopeState extends State<AppScope> {
       selectedSlot: storedBooking.slot,
     );
     final items = ItemsNotifier(items: ItemsNotifier.fromJson(service.loadMyItems()));
-    final coach = CoachMarksNotifier(isFirstRun: service.isFirstRun());
     final search = SearchNotifier(
       initialRecent: service.loadRecentSearches(),
       initialSaved: service.loadSavedSearches(),
@@ -93,11 +91,6 @@ class _AppScopeState extends State<AppScope> {
       service.saveCatalogListMode(catalog.listMode);
       service.saveCatalogSort(catalog.sort.name);
     });
-    coach.addListener(() {
-      if (!coach.shouldShow) {
-        service.setFirstRunDone();
-      }
-    });
     search.addListener(() {
       service.saveRecentSearches(search.recent);
       service.saveSavedSearches(search.savedSearchStorage);
@@ -124,7 +117,6 @@ class _AppScopeState extends State<AppScope> {
       authNotifier: auth,
       itemsNotifier: items,
       notificationsNotifier: notifications,
-      coachMarksNotifier: coach,
       searchNotifier: search,
       preferencesService: service,
     );
@@ -156,7 +148,6 @@ class AppScopeData extends ChangeNotifier {
     required this.authNotifier,
     required this.itemsNotifier,
     required this.notificationsNotifier,
-    required this.coachMarksNotifier,
     required this.searchNotifier,
     required this.preferencesService,
   }) {
@@ -169,7 +160,6 @@ class AppScopeData extends ChangeNotifier {
     _listen(authNotifier);
     _listen(itemsNotifier);
     _listen(notificationsNotifier);
-    _listen(coachMarksNotifier);
     _listen(searchNotifier);
   }
 
@@ -182,7 +172,6 @@ class AppScopeData extends ChangeNotifier {
   final AuthNotifier authNotifier;
   final ItemsNotifier itemsNotifier;
   final NotificationsNotifier notificationsNotifier;
-  final CoachMarksNotifier coachMarksNotifier;
   final SearchNotifier searchNotifier;
   final PreferencesService preferencesService;
   final List<VoidCallback> _listeners = <VoidCallback>[];
@@ -206,7 +195,6 @@ class AppScopeData extends ChangeNotifier {
     itemsNotifier.reset();
     notificationsNotifier.reset();
     searchNotifier.reset();
-    coachMarksNotifier.reset();
     authNotifier.logout();
   }
 
@@ -224,7 +212,6 @@ class AppScopeData extends ChangeNotifier {
     authNotifier.dispose();
     itemsNotifier.dispose();
     notificationsNotifier.dispose();
-    coachMarksNotifier.dispose();
     searchNotifier.dispose();
     super.dispose();
   }
