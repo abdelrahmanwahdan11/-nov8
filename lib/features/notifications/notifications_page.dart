@@ -2,43 +2,33 @@ import 'package:flutter/material.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/state/app_scope.dart';
-import '../../core/utils/formatters.dart';
-import '../../data/models/offer.dart';
+import '../../core/state/notifiers/notifications_notifier.dart';
+import '../../core/utils/notifications_builder.dart';
 
-class NotificationsPage extends StatefulWidget {
+class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
 
   @override
-  State<NotificationsPage> createState() => _NotificationsPageState();
-}
-
-class _NotificationsPageState extends State<NotificationsPage> {
-  final Set<String> _read = <String>{};
-  AppScopeData? _scope;
-  bool _loaded = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final scope = AppScope.of(context);
-    if (_scope != scope) {
-      _scope = scope;
-    }
-    if (!_loaded && _scope != null) {
-      _read.addAll(_scope!.preferencesService.loadReadNotifications());
-      _loaded = true;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final scope = AppScope.of(context);
+    final l10n = AppLocalizations.of(context);
+    final notifier = scope.notificationsNotifier;
+    final animation = Listenable.merge([
+      notifier,
+      scope.bookingNotifier,
+      scope.itemsNotifier,
+    ]);
+
     return AnimatedBuilder(
-      animation: scope,
+      animation: animation,
       builder: (context, _) {
-        final notifications = _collectNotifications(context, scope, l10n);
-        final unreadCount = notifications.where((item) => !_read.contains(item.id)).length;
+        final notifications = buildNotifications(
+          scope: scope,
+          l10n: l10n,
+          material: MaterialLocalizations.of(context),
+        );
+        final unreadCount =
+            notifications.where((item) => !notifier.isRead(item.id)).length;
         return Scaffold(
           appBar: AppBar(
             title: Text(l10n.t('notifications')),
@@ -47,7 +37,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 IconButton(
                   icon: const Icon(Icons.done_all),
                   tooltip: l10n.t('mark_all_read'),
-                  onPressed: () => _markAll(notifications, l10n),
+                  onPressed: () => _markAll(context, notifications, notifier, l10n),
                 ),
             ],
           ),
@@ -70,12 +60,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final item = notifications[index];
-                          final isRead = _read.contains(item.id);
+                          final isRead = notifier.isRead(item.id);
                           return _NotificationTile(
                             item: item,
                             isRead: isRead,
                             l10n: l10n,
-                            onMarked: () => _markNotification(item, l10n),
+                            onMarked: () =>
+                                _markNotification(context, item, notifier, l10n),
                           );
                         },
                       ),
@@ -87,103 +78,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  void _markNotification(_NotificationItem item, AppLocalizations l10n) {
-    if (_read.contains(item.id)) return;
-    setState(() {
-      _read.add(item.id);
-    });
-    _saveRead();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.t('notification_marked'))));
-  }
-
-  void _markAll(List<_NotificationItem> items, AppLocalizations l10n) {
-    var changed = false;
-    for (final item in items) {
-      if (_read.add(item.id)) {
-        changed = true;
-      }
-    }
-    if (changed) {
-      setState(() {});
-      _saveRead();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.t('marked_all_read'))));
-    }
-  }
-
-  void _saveRead() {
-    final scope = _scope;
-    if (scope != null) {
-      scope.preferencesService.saveReadNotifications(_read.toList());
-    }
-  }
-
-  List<_NotificationItem> _collectNotifications(
+  void _markNotification(
     BuildContext context,
-    AppScopeData scope,
+    NotificationDescriptor item,
+    NotificationsNotifier notifier,
     AppLocalizations l10n,
   ) {
-    final materialLocalizations = MaterialLocalizations.of(context);
-    final items = <_NotificationItem>[];
-
-    final booking = scope.bookingNotifier.selectedDate;
-    if (booking != null) {
-      final dateLabel = '${materialLocalizations.formatMediumDate(booking)} • ${materialLocalizations.formatTimeOfDay(TimeOfDay.fromDateTime(booking))}';
-      items.add(
-        _NotificationItem(
-          id: 'booking_${booking.toIso8601String()}',
-          title: l10n.t('notification_booking_set').replaceFirst('%s', dateLabel),
-          icon: Icons.calendar_month,
-          timestamp: booking,
-          timestampLabel: materialLocalizations.formatShortDate(booking),
-        ),
-      );
+    final changed = notifier.markRead(item.id);
+    if (changed) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.t('notification_marked'))));
     }
+  }
 
-    for (final offer in scope.itemsNotifier.offers) {
-      final statusLabel = switch (offer.status) {
-        OfferStatus.pending => l10n.t('offer_status_pending'),
-        OfferStatus.accepted => l10n.t('offer_status_accepted'),
-        OfferStatus.declined => l10n.t('offer_status_declined'),
-        OfferStatus.countered => l10n.t('offer_status_countered'),
-      };
-
-      final idBase = 'offer_${offer.id}_${offer.updatedAt.toIso8601String()}';
-      if (offer.status == OfferStatus.pending) {
-        items.add(
-          _NotificationItem(
-            id: '${idBase}_pending',
-            title: l10n.t('notifications_offer_pending').replaceFirst('%s', offer.fromUser),
-            subtitle: AppFormatters.currency(offer.amount),
-            icon: Icons.mark_unread_chat_alt_outlined,
-            timestamp: offer.updatedAt,
-            timestampLabel: materialLocalizations.formatShortDate(offer.updatedAt),
-          ),
-        );
-      } else {
-        items.add(
-          _NotificationItem(
-            id: '${idBase}_${offer.status.name}',
-            title: l10n
-                .t('notifications_offer_status')
-                .replaceFirst('%s', offer.fromUser)
-                .replaceFirst('%t', statusLabel),
-            subtitle: offer.counterAmount != null
-                ? l10n.t('offer_counter_value').replaceFirst('%s', AppFormatters.currency(offer.counterAmount!))
-                : AppFormatters.currency(offer.amount),
-            icon: offer.status == OfferStatus.accepted
-                ? Icons.task_alt
-                : offer.status == OfferStatus.declined
-                    ? Icons.block
-                    : Icons.swap_horiz,
-            timestamp: offer.updatedAt,
-            timestampLabel: materialLocalizations.formatShortDate(offer.updatedAt),
-          ),
-        );
-      }
+  void _markAll(
+    BuildContext context,
+    List<NotificationDescriptor> items,
+    NotificationsNotifier notifier,
+    AppLocalizations l10n,
+  ) {
+    final changed = notifier.markAll(items.map((item) => item.id));
+    if (changed) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.t('marked_all_read'))));
     }
-
-    items.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return items;
   }
 }
 
@@ -195,7 +113,7 @@ class _NotificationTile extends StatelessWidget {
     required this.l10n,
   });
 
-  final _NotificationItem item;
+  final NotificationDescriptor item;
   final bool isRead;
   final VoidCallback onMarked;
   final AppLocalizations l10n;
@@ -203,7 +121,8 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final background = isRead ? theme.colorScheme.surface : theme.colorScheme.primary.withOpacity(0.08);
+    final background =
+        isRead ? theme.colorScheme.surface : theme.colorScheme.primary.withOpacity(0.08);
     final leadingColor = item.color ?? theme.colorScheme.primary.withOpacity(0.12);
     return Dismissible(
       key: ValueKey(item.id),
@@ -270,7 +189,8 @@ class _NotificationTile extends StatelessWidget {
                       ),
                       child: Text(
                         l10n.t('badge_new'),
-                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onPrimary),
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: theme.colorScheme.onPrimary),
                       ),
                     ),
                 ],
@@ -281,24 +201,4 @@ class _NotificationTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _NotificationItem {
-  _NotificationItem({
-    required this.id,
-    required this.title,
-    required this.icon,
-    required this.timestamp,
-    required this.timestampLabel,
-    this.subtitle,
-    this.color,
-  });
-
-  final String id;
-  final String title;
-  final String? subtitle;
-  final IconData icon;
-  final DateTime timestamp;
-  final String timestampLabel;
-  final Color? color;
 }

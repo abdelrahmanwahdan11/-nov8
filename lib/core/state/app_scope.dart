@@ -10,6 +10,7 @@ import 'notifiers/compare_notifier.dart';
 import 'notifiers/favorites_notifier.dart';
 import 'notifiers/items_notifier.dart';
 import 'notifiers/locale_notifier.dart';
+import 'notifiers/notifications_notifier.dart';
 import 'notifiers/search_notifier.dart';
 import 'notifiers/theme_notifier.dart';
 
@@ -64,6 +65,7 @@ class _AppScopeState extends State<AppScope> {
       user: storedAuth.isGuest ? null : storedUser,
       isGuest: storedAuth.isGuest,
     );
+    final notifications = NotificationsNotifier(preferencesService: service);
 
     themeNotifier.addListener(() {
       service.saveDarkMode(themeNotifier.isDarkMode);
@@ -114,6 +116,7 @@ class _AppScopeState extends State<AppScope> {
       bookingNotifier: booking,
       authNotifier: auth,
       itemsNotifier: items,
+      notificationsNotifier: notifications,
       coachMarksNotifier: coach,
       searchNotifier: search,
       preferencesService: service,
@@ -145,6 +148,7 @@ class AppScopeData extends ChangeNotifier {
     required this.bookingNotifier,
     required this.authNotifier,
     required this.itemsNotifier,
+    required this.notificationsNotifier,
     required this.coachMarksNotifier,
     required this.searchNotifier,
     required this.preferencesService,
@@ -157,6 +161,7 @@ class AppScopeData extends ChangeNotifier {
     _listen(bookingNotifier);
     _listen(authNotifier);
     _listen(itemsNotifier);
+    _listen(notificationsNotifier);
     _listen(coachMarksNotifier);
     _listen(searchNotifier);
   }
@@ -169,6 +174,7 @@ class AppScopeData extends ChangeNotifier {
   final BookingNotifier bookingNotifier;
   final AuthNotifier authNotifier;
   final ItemsNotifier itemsNotifier;
+  final NotificationsNotifier notificationsNotifier;
   final CoachMarksNotifier coachMarksNotifier;
   final SearchNotifier searchNotifier;
   final PreferencesService preferencesService;
@@ -191,10 +197,10 @@ class AppScopeData extends ChangeNotifier {
     catalogNotifier.reset();
     bookingNotifier.reset();
     itemsNotifier.reset();
+    notificationsNotifier.reset();
     searchNotifier.reset();
     coachMarksNotifier.reset();
     authNotifier.logout();
-    preferencesService.saveReadNotifications(const <String>[]);
   }
 
   @override
@@ -210,6 +216,7 @@ class AppScopeData extends ChangeNotifier {
     bookingNotifier.dispose();
     authNotifier.dispose();
     itemsNotifier.dispose();
+    notificationsNotifier.dispose();
     coachMarksNotifier.dispose();
     searchNotifier.dispose();
     super.dispose();

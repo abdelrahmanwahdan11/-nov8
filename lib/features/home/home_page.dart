@@ -8,6 +8,7 @@ import '../../core/widgets/compare_tray.dart';
 import '../../core/widgets/property_card.dart';
 import '../../core/widgets/search_bar_x.dart';
 import '../../core/widgets/spin_gallery_3d.dart';
+import '../../core/utils/notifications_builder.dart';
 import '../../data/mocks/mock_data.dart';
 import '../../data/models/property.dart';
 
@@ -135,10 +136,28 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(IconlyLight.notification),
-            tooltip: l10n.t('notifications'),
-            onPressed: () => Navigator.of(context).pushNamed('/notifications'),
+          AnimatedBuilder(
+            animation: Listenable.merge([
+              scope.notificationsNotifier,
+              scope.bookingNotifier,
+              scope.itemsNotifier,
+            ]),
+            builder: (context, _) {
+              final notifications = buildNotifications(
+                scope: scope,
+                l10n: l10n,
+                material: MaterialLocalizations.of(context),
+              );
+              final unread =
+                  notifications.where((item) => !scope.notificationsNotifier.isRead(item.id)).length;
+              return _buildBadgeIcon(
+                context,
+                icon: IconlyLight.notification,
+                count: unread,
+                tooltip: l10n.t('notifications'),
+                onTap: () => Navigator.of(context).pushNamed('/notifications'),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(IconlyLight.setting),
