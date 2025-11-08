@@ -2,19 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../utils/text_normalizer.dart';
 import '../../../data/mocks/mock_data.dart';
 import '../../../data/models/property.dart';
 
 class SearchNotifier extends ChangeNotifier {
   SearchNotifier({List<String>? initialRecent})
       : _recent = List<String>.from(initialRecent ?? <String>[]),
-        _results = List<Property>.from(MockData.properties);
+        _indexed = MockData.properties
+            .map((property) => _IndexedProperty(property: property, index: _composeIndex(property)))
+            .toList(),
+        _results = _indexed.map((entry) => entry.property).toList();
 
   final List<String> _recent;
   Timer? _debounce;
   String _query = '';
   List<Property> _results;
   bool _isLoading = false;
+  final List<_IndexedProperty> _indexed;
 
   String get query => _query;
   List<Property> get results => _results;
@@ -26,30 +31,50 @@ class SearchNotifier extends ChangeNotifier {
     if (query.isEmpty) {
       return List<String>.from(_recent.take(6));
     }
-    final normalized = query.toLowerCase();
-    final source = <String>{
-      for (final property in MockData.properties) ...{
-        property.title,
-        property.city,
-        property.description,
-        ...property.tags,
-      },
-    };
-    final combined = <String>[
-      ..._recent.where((element) => element.toLowerCase().contains(normalized)),
-      ...source.where((element) => element.toLowerCase().contains(normalized)),
-    ];
+    final normalizedQuery = normalizeText(query);
+    if (normalizedQuery.isEmpty) {
+      return List<String>.from(_recent.take(6));
+    }
+
     final seen = <String>{};
     final results = <String>[];
-    for (final value in combined) {
-      final key = value.toLowerCase();
-      if (seen.add(key)) {
-        results.add(value);
-      }
-      if (results.length >= 8) {
-        break;
+
+    void addCandidate(String candidate) {
+      if (candidate.isEmpty) return;
+      final normalizedCandidate = normalizeText(candidate);
+      if (!normalizedCandidate.contains(normalizedQuery)) return;
+      if (seen.add(normalizedCandidate)) {
+        results.add(candidate);
       }
     }
+
+    for (final recent in _recent) {
+      addCandidate(recent);
+      if (results.length >= 8) {
+        return results;
+      }
+    }
+
+    for (final entry in _indexed) {
+      addCandidate(entry.property.title);
+      if (results.length >= 8) break;
+      addCandidate(entry.property.city);
+      if (results.length >= 8) break;
+      for (final token in entry.property.city.split(RegExp(r'\s+'))) {
+        addCandidate(token);
+        if (results.length >= 8) break;
+      }
+      for (final token in entry.property.title.split(RegExp(r'\s+'))) {
+        addCandidate(token);
+        if (results.length >= 8) break;
+      }
+      for (final tag in entry.property.tags) {
+        addCandidate(tag);
+        if (results.length >= 8) break;
+      }
+      if (results.length >= 8) break;
+    }
+
     return results;
   }
 
@@ -59,7 +84,7 @@ class SearchNotifier extends ChangeNotifier {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
       _isLoading = false;
-      _results = List<Property>.from(MockData.properties);
+      _results = _indexed.map((entry) => entry.property).toList();
       notifyListeners();
       return;
     }
@@ -67,14 +92,20 @@ class SearchNotifier extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final scheduledQuery = trimmed.toLowerCase();
+    final normalizedQuery = normalizeText(trimmed);
+    if (normalizedQuery.isEmpty) {
+      _isLoading = false;
+      _results = _indexed.map((entry) => entry.property).toList();
+      notifyListeners();
+      return;
+    }
+
     _debounce = Timer(const Duration(milliseconds: 320), () async {
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      final results = MockData.properties.where((property) {
-        final text = '${property.title} ${property.city} ${property.description} '
-            '${property.facilities.beds} beds ${property.facilities.baths} baths ${property.tags.join(' ')}';
-        return text.toLowerCase().contains(scheduledQuery);
-      }).toList();
+      final results = _indexed
+          .where((entry) => entry.index.contains(normalizedQuery))
+          .map((entry) => entry.property)
+          .toList();
       _results = results;
       _isLoading = false;
       notifyListeners();
@@ -84,7 +115,11 @@ class SearchNotifier extends ChangeNotifier {
   void commitQuery(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
-    _recent.remove(trimmed);
+    final normalized = normalizeText(trimmed);
+    final existingIndex = _recent.indexWhere((element) => normalizeText(element) == normalized);
+    if (existingIndex != -1) {
+      _recent.removeAt(existingIndex);
+    }
     _recent.insert(0, trimmed);
     if (_recent.length > 6) {
       _recent.removeLast();
@@ -95,7 +130,7 @@ class SearchNotifier extends ChangeNotifier {
   void reset() {
     _debounce?.cancel();
     _query = '';
-    _results = List<Property>.from(MockData.properties);
+    _results = _indexed.map((entry) => entry.property).toList();
     _recent.clear();
     _isLoading = false;
     notifyListeners();
@@ -106,4 +141,33 @@ class SearchNotifier extends ChangeNotifier {
     _debounce?.cancel();
     super.dispose();
   }
+}
+
+class _IndexedProperty {
+  const _IndexedProperty({required this.property, required this.index});
+
+  final Property property;
+  final String index;
+}
+
+String _composeIndex(Property property) {
+  final buffer = StringBuffer()
+    ..write(property.title)
+    ..write(' ')
+    ..write(property.city)
+    ..write(' ')
+    ..write(property.description)
+    ..write(' ')
+    ..write(property.facilities.beds)
+    ..write(' beds ')
+    ..write(property.facilities.baths)
+    ..write(' baths ')
+    ..write(property.facilities.area)
+    ..write(' area ')
+    ..write(property.facilities.parking)
+    ..write(' parking ')
+    ..write(property.facilities.garden)
+    ..write(' garden ')
+    ..writeAll(property.tags, ' ');
+  return normalizeText(buffer.toString());
 }

@@ -54,6 +54,16 @@ class _SearchPageState extends State<SearchPage> {
                   isLoading: notifier.isLoading,
                 ),
               ),
+              _SummaryBar(
+                query: notifier.query,
+                isLoading: notifier.isLoading,
+                resultCount: notifier.results.length,
+                onClear: () {
+                  _controller.clear();
+                  notifier.updateQuery('');
+                  FocusScope.of(context).unfocus();
+                },
+              ),
               if (notifier.recent.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
@@ -117,6 +127,63 @@ class _SearchPageState extends State<SearchPage> {
           );
         },
       ),
+    );
+  }
+}
+
+class _SummaryBar extends StatelessWidget {
+  const _SummaryBar({
+    required this.query,
+    required this.isLoading,
+    required this.resultCount,
+    required this.onClear,
+  });
+
+  final String query;
+  final bool isLoading;
+  final int resultCount;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQuery = query.trim().isNotEmpty;
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final summaryLabel = isLoading
+        ? l10n.t('loading')
+        : l10n.t('search_results_count').replaceFirst('%d', resultCount.toString());
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: hasQuery
+          ? Padding(
+              key: const ValueKey('summary'),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+              child: Row(
+                children: [
+                  if (isLoading)
+                    const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Icon(Icons.search, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      summaryLabel,
+                      style: theme.textTheme.labelLarge,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: onClear,
+                    icon: const Icon(Icons.close),
+                    label: Text(l10n.t('clear_search')),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox(key: ValueKey('empty')),
     );
   }
 }
