@@ -232,6 +232,29 @@ class SearchNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  void recordPropertyOpened(String propertyId) {
+    if (_savedSearches.isEmpty) {
+      return;
+    }
+    var changed = false;
+    for (var i = 0; i < _savedSearches.length; i++) {
+      final entry = _savedSearches[i];
+      final matches = _matchesForEntry(entry);
+      if (!matches.any((property) => property.id == propertyId)) {
+        continue;
+      }
+      final merged = _mergeSeenPropertyIds([propertyId], entry.lastSeenPropertyIds);
+      if (_listsDiffer(merged, entry.lastSeenPropertyIds)) {
+        _savedSearches[i] = entry.copyWith(lastSeenPropertyIds: merged);
+        changed = true;
+      }
+    }
+    if (changed) {
+      _refreshSavedSearchSnapshots();
+      notifyListeners();
+    }
+  }
+
   void toggleCity(String city) {
     final normalized = normalizeText(city);
     if (_activeCityNormalized == normalized) {
@@ -399,21 +422,84 @@ class SearchNotifier extends ChangeNotifier {
     return ids;
   }
 
+  List<String> _mergeSeenPropertyIds(
+    Iterable<String> additions,
+    List<String> existing, {
+    int limit = 32,
+  }) {
+    if (limit <= 0) {
+      return const [];
+    }
+    final visited = <String>{};
+    final merged = <String>[];
+    for (final id in additions) {
+      final trimmed = id.trim();
+      if (trimmed.isEmpty) {
+        continue;
+      }
+      if (visited.add(trimmed)) {
+        merged.add(trimmed);
+        if (merged.length >= limit) {
+          return merged;
+        }
+      }
+    }
+    for (final id in existing) {
+      final trimmed = id.trim();
+      if (trimmed.isEmpty) {
+        continue;
+      }
+      if (visited.add(trimmed)) {
+        merged.add(trimmed);
+        if (merged.length >= limit) {
+          break;
+        }
+      }
+    }
+    return merged;
+  }
+
+  bool _listsDiffer(List<String> a, List<String> b) {
+    if (identical(a, b)) {
+      return false;
+    }
+    if (a.length != b.length) {
+      return true;
+    }
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void _refreshSavedSearchSnapshots() {
     if (_savedSearches.isEmpty) {
       _savedSnapshots = const [];
       return;
     }
+    final previous = {for (final snapshot in _savedSnapshots) snapshot.entry.id: snapshot};
     final snapshots = <SavedSearchSnapshot>[];
     for (final entry in _savedSearches) {
       final matches = List<Property>.from(_matchesForEntry(entry));
       final seen = entry.lastSeenPropertyIds.toSet();
-      final unseen = matches.where((property) => !seen.contains(property.id)).length;
+      final unseenMatches =
+          matches.where((property) => !seen.contains(property.id)).toList(growable: false);
+      final signature = unseenMatches.take(6).map((property) => property.id).join('|');
+      final previousSnapshot = previous[entry.id];
+      final generatedAt =
+          previousSnapshot != null && previousSnapshot.signature == signature
+              ? previousSnapshot.generatedAt
+              : DateTime.now();
       snapshots.add(
         SavedSearchSnapshot(
           entry: entry,
           matches: List<Property>.unmodifiable(matches),
-          unseenCount: unseen,
+          unseenCount: unseenMatches.length,
+          unseenMatches: List<Property>.unmodifiable(unseenMatches),
+          signature: signature,
+          generatedAt: generatedAt,
         ),
       );
     }
@@ -592,11 +678,17 @@ class SavedSearchSnapshot {
     required this.entry,
     required this.matches,
     required this.unseenCount,
+    required this.unseenMatches,
+    required this.signature,
+    required this.generatedAt,
   });
 
   final SavedSearchEntry entry;
   final List<Property> matches;
   final int unseenCount;
+  final List<Property> unseenMatches;
+  final String signature;
+  final DateTime generatedAt;
 }
 
 class SavedSearchEntry {

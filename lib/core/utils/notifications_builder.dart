@@ -98,6 +98,38 @@ List<NotificationDescriptor> buildNotifications({
     }
   }
 
+  for (final snapshot in scope.searchNotifier.savedSnapshots) {
+    if (snapshot.unseenCount <= 0) {
+      continue;
+    }
+    final unseenMatches = snapshot.unseenMatches;
+    if (unseenMatches.isEmpty) {
+      continue;
+    }
+    final entry = snapshot.entry;
+    final signature = snapshot.signature.isNotEmpty ? snapshot.signature : unseenMatches.first.id;
+    final title =
+        l10n.t('saved_search_notification_title').replaceFirst('%s', entry.label);
+    final subtitle = l10n
+        .t('saved_search_notification_subtitle')
+        .replaceFirst('%d', unseenMatches.length.toString());
+    final preview = l10n
+        .t('saved_search_notification_preview')
+        .replaceFirst('%s', unseenMatches.first.title);
+
+    items.add(
+      NotificationDescriptor(
+        id: 'saved_search_${entry.id}_$signature',
+        title: title,
+        subtitle: '$subtitle • $preview',
+        icon: Icons.search_outlined,
+        timestamp: snapshot.generatedAt,
+        timestampLabel: material.formatShortDate(snapshot.generatedAt),
+        color: scope.themeNotifier.accentColor,
+      ),
+    );
+  }
+
   items.sort((a, b) => b.timestamp.compareTo(a.timestamp));
   return items;
 }

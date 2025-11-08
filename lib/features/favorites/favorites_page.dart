@@ -27,7 +27,9 @@ class FavoritesPage extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: PropertyCard(
                     property: property,
-                    onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                    onTap: () => Navigator.of(context)
+                        .pushNamed('/details', arguments: property.id)
+                        .then((_) => scope.searchNotifier.recordPropertyOpened(property.id)),
                     onFavorite: () => scope.favoritesNotifier.toggle(property.id),
                     onCompare: () => scope.compareNotifier.toggle(property.id),
                     isFavorite: true,

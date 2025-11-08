@@ -17,6 +17,7 @@ class NotificationsPage extends StatelessWidget {
       notifier,
       scope.bookingNotifier,
       scope.itemsNotifier,
+      scope.searchNotifier,
     ]);
 
     return AnimatedBuilder(

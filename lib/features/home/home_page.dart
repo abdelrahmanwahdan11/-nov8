@@ -97,6 +97,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _openProperty(AppScopeData scope, String propertyId) {
+    Navigator.of(context)
+        .pushNamed('/details', arguments: propertyId)
+        .then((_) {
+      if (!mounted) return;
+      scope.searchNotifier.recordPropertyOpened(propertyId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
@@ -142,6 +151,7 @@ class _HomePageState extends State<HomePage> {
               scope.notificationsNotifier,
               scope.bookingNotifier,
               scope.itemsNotifier,
+              scope.searchNotifier,
             ]),
             builder: (context, _) {
               final notifications = buildNotifications(
@@ -264,15 +274,22 @@ class _HomePageState extends State<HomePage> {
                         separatorBuilder: (_, __) => const SizedBox(width: 12),
                         itemBuilder: (context, index) {
                           final snapshot = previewList[index];
-                          return _SavedSearchQuickCard(
-                            snapshot: snapshot,
-                            onTap: () {
-                              scope.searchNotifier.applySavedSearch(snapshot.entry.id);
-                              Navigator.of(context).pushNamed('/search');
-                            },
-                            onManage: () => Navigator.of(context).pushNamed('/search'),
-                          );
-                        },
+                  return _SavedSearchQuickCard(
+                    snapshot: snapshot,
+                    onTap: () {
+                      scope.searchNotifier.applySavedSearch(snapshot.entry.id);
+                      final message = snapshot.unseenCount > 0
+                          ? l10n
+                              .t('saved_search_applied_with_new')
+                              .replaceFirst('%d', snapshot.unseenCount.toString())
+                          : l10n.t('saved_search_applied');
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(message)));
+                      Navigator.of(context).pushNamed('/search');
+                    },
+                    onManage: () => Navigator.of(context).pushNamed('/search'),
+                  );
+                },
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -295,8 +312,7 @@ class _HomePageState extends State<HomePage> {
                   key: ValueKey(heroProperty.id),
                   frames: heroProperty.spinFrames,
                   heroTag: heroProperty.id,
-                  onTap: () => Navigator.of(context)
-                      .pushNamed('/details', arguments: heroProperty.id),
+                  onTap: () => _openProperty(scope, heroProperty.id),
                 ),
               ),
             ),
@@ -315,7 +331,7 @@ class _HomePageState extends State<HomePage> {
                     width: 280,
                     child: PropertyCard(
                       property: property,
-                      onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                      onTap: () => _openProperty(scope, property.id),
                       onFavorite: () => scope.favoritesNotifier.toggle(property.id),
                       onCompare: () => scope.compareNotifier.toggle(property.id),
                       isFavorite: scope.favoritesNotifier.isFavorite(property.id),
@@ -338,8 +354,7 @@ class _HomePageState extends State<HomePage> {
                 itemBuilder: (context, index) {
                   final property = curatedCity[index];
                   return GestureDetector(
-                    onTap: () => Navigator.of(context)
-                        .pushNamed('/details', arguments: property.id),
+                    onTap: () => _openProperty(scope, property.id),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
                       child: Stack(
@@ -444,6 +459,7 @@ class _SavedSearchQuickCard extends StatelessWidget {
         l10n.t('saved_search_new_badge').replaceFirst('%d', snapshot.unseenCount.toString());
     final totalLabel =
         l10n.t('saved_search_total_label').replaceFirst('%d', snapshot.matches.length.toString());
+    final latest = snapshot.unseenMatches.isNotEmpty ? snapshot.unseenMatches.first : null;
 
     return InkWell(
       onTap: onTap,
@@ -501,6 +517,18 @@ class _SavedSearchQuickCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+            if (latest != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                l10n.t('saved_search_notification_preview').replaceFirst('%s', latest.title),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [

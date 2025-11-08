@@ -44,6 +44,15 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  void _openProperty(AppScopeData scope, String propertyId) {
+    Navigator.of(context)
+        .pushNamed('/details', arguments: propertyId)
+        .then((_) {
+      if (!mounted) return;
+      scope.searchNotifier.recordPropertyOpened(propertyId);
+    });
+  }
+
   Future<String?> _promptForLabel({
     required BuildContext context,
     required String title,
@@ -91,12 +100,20 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  void _applySavedSearch(BuildContext context, SearchNotifier notifier, SavedSearchEntry entry, AppLocalizations l10n) {
-    notifier.applySavedSearch(entry.id);
+  void _applySavedSearch(
+    BuildContext context,
+    SearchNotifier notifier,
+    SavedSearchSnapshot snapshot,
+    AppLocalizations l10n,
+  ) {
+    notifier.applySavedSearch(snapshot.entry.id);
     _controller.text = notifier.query;
     FocusScope.of(context).unfocus();
+    final message = snapshot.unseenCount > 0
+        ? l10n.t('saved_search_applied_with_new').replaceFirst('%d', snapshot.unseenCount.toString())
+        : l10n.t('saved_search_applied');
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.t('saved_search_applied'))),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -237,7 +254,7 @@ class _SearchPageState extends State<SearchPage> {
                                 child: _SavedSearchCard(
                                   snapshot: snapshot,
                                   onApply: () =>
-                                      _applySavedSearch(context, notifier, snapshot.entry, l10n),
+                                      _applySavedSearch(context, notifier, snapshot, l10n),
                                   onRename: () =>
                                       _renameSavedSearch(context, notifier, snapshot.entry, l10n),
                                   onDelete: () =>
@@ -298,7 +315,7 @@ class _SearchPageState extends State<SearchPage> {
                                 padding: const EdgeInsets.only(bottom: 16),
                                 child: PropertyCard(
                                   property: property,
-                                  onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                                  onTap: () => _openProperty(scope, property.id),
                                   onFavorite: () => scope.favoritesNotifier.toggle(property.id),
                                   onCompare: () => scope.compareNotifier.toggle(property.id),
                                   isFavorite: scope.favoritesNotifier.isFavorite(property.id),
@@ -340,6 +357,7 @@ class _SavedSearchCard extends StatelessWidget {
         l10n.t('saved_search_total_label').replaceFirst('%d', snapshot.matches.length.toString());
     final badgeLabel =
         l10n.t('saved_search_new_badge').replaceFirst('%d', snapshot.unseenCount.toString());
+    final latest = snapshot.unseenMatches.isNotEmpty ? snapshot.unseenMatches.first : null;
 
     return Card(
       child: Padding(
@@ -358,6 +376,16 @@ class _SavedSearchCard extends StatelessWidget {
                       if (description.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(description, style: theme.textTheme.bodySmall),
+                      ],
+                      if (latest != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.t('saved_search_notification_preview').replaceFirst('%s', latest.title),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ],
                   ),

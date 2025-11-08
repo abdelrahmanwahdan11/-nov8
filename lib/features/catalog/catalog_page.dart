@@ -30,6 +30,14 @@ class _CatalogPageState extends State<CatalogPage> {
     final scope = AppScope.of(context);
     final notifier = scope.catalogNotifier;
     final l10n = AppLocalizations.of(context);
+    void openProperty(String propertyId) {
+      Navigator.of(context)
+          .pushNamed('/details', arguments: propertyId)
+          .then((_) {
+        if (!mounted) return;
+        scope.searchNotifier.recordPropertyOpened(propertyId);
+      });
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.t('catalog')),
@@ -140,7 +148,7 @@ class _CatalogPageState extends State<CatalogPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: PropertyCard(
                       property: property,
-                      onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                      onTap: () => openProperty(property.id),
                       onFavorite: () => scope.favoritesNotifier.toggle(property.id),
                       onCompare: () => scope.compareNotifier.toggle(property.id),
                       isFavorite: scope.favoritesNotifier.isFavorite(property.id),
@@ -184,7 +192,7 @@ class _CatalogPageState extends State<CatalogPage> {
                           final property = notifier.visible[index];
                           return PropertyCard(
                             property: property,
-                            onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                            onTap: () => openProperty(property.id),
                             onFavorite: () => scope.favoritesNotifier.toggle(property.id),
                             onCompare: () => scope.compareNotifier.toggle(property.id),
                             isFavorite: scope.favoritesNotifier.isFavorite(property.id),
