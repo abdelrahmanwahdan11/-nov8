@@ -8,6 +8,8 @@ class PaginationList extends StatelessWidget {
     required this.onLoadMore,
     required this.isLoading,
     this.controller,
+    this.header,
+    this.padding,
   });
 
   final int itemCount;
@@ -15,6 +17,8 @@ class PaginationList extends StatelessWidget {
   final VoidCallback onLoadMore;
   final bool isLoading;
   final ScrollController? controller;
+  final Widget? header;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
@@ -27,15 +31,21 @@ class PaginationList extends StatelessWidget {
       },
       child: ListView.builder(
         controller: controller,
-        itemCount: itemCount + (isLoading ? 1 : 0),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: padding,
+        itemCount: itemCount + (isLoading ? 1 : 0) + (header != null ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= itemCount) {
+          if (header != null && index == 0) {
+            return header!;
+          }
+          final dataIndex = index - (header != null ? 1 : 0);
+          if (dataIndex >= itemCount) {
             return const Padding(
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             );
           }
-          return itemBuilder(context, index);
+          return itemBuilder(context, dataIndex);
         },
       ),
     );

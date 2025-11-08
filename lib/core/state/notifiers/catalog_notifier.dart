@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../data/models/property.dart';
 import '../../../data/mocks/mock_data.dart';
 
+enum CatalogSort { recommended, priceLowToHigh, priceHighToLow, areaHighToLow }
+
 class CatalogFilters {
   static const _sentinel = Object();
 
@@ -52,18 +54,21 @@ class CatalogFilters {
 }
 
 class CatalogNotifier extends ChangeNotifier {
-  CatalogNotifier() {
+  CatalogNotifier({CatalogSort initialSort = CatalogSort.recommended, bool initialListMode = true}) {
     _all = List<Property>.from(MockData.properties);
-    _visible = _all.take(_pageSize).toList();
+    sort = initialSort;
+    listMode = initialListMode;
+    _applyPage(1);
   }
 
   late List<Property> _all;
   late List<Property> _visible;
   CatalogFilters filters = CatalogFilters();
+  late CatalogSort sort;
+  late bool listMode;
   int _currentPage = 1;
   final int _pageSize = 6;
   bool _isLoading = false;
-  bool listMode = true;
 
   List<Property> get visible => _visible;
   bool get isLoading => _isLoading;
@@ -71,7 +76,7 @@ class CatalogNotifier extends ChangeNotifier {
   int get totalPages => (_filtered.length / _pageSize).ceil().clamp(1, 999);
 
   List<Property> get _filtered {
-    return _all.where((property) {
+    final filtered = _all.where((property) {
       if (filters.tags.isNotEmpty && filters.tags.intersection(property.tags.toSet()).isEmpty) {
         return false;
       }
@@ -92,6 +97,7 @@ class CatalogNotifier extends ChangeNotifier {
       }
       return true;
     }).toList();
+    return _applySort(filtered);
   }
 
   Future<void> refresh() async {
@@ -106,6 +112,13 @@ class CatalogNotifier extends ChangeNotifier {
 
   void toggleViewMode() {
     listMode = !listMode;
+    notifyListeners();
+  }
+
+  void updateSort(CatalogSort newSort) {
+    if (sort == newSort) return;
+    sort = newSort;
+    _applyPage(1);
     notifyListeners();
   }
 
@@ -144,8 +157,40 @@ class CatalogNotifier extends ChangeNotifier {
     _all = List<Property>.from(MockData.properties);
     filters = CatalogFilters();
     listMode = true;
+    sort = CatalogSort.recommended;
     _isLoading = false;
     _applyPage(1);
     notifyListeners();
+  }
+
+  int get activeFiltersCount {
+    var count = filters.tags.length;
+    if (filters.city != null) count += 1;
+    if (filters.minBeds != null) count += 1;
+    if (filters.minBaths != null) count += 1;
+    if (filters.minArea != null) count += 1;
+    if (filters.maxPrice != null) count += 1;
+    return count;
+  }
+
+  List<Property> _applySort(List<Property> items) {
+    if (sort == CatalogSort.recommended) {
+      return items;
+    }
+    final sorted = List<Property>.from(items);
+    switch (sort) {
+      case CatalogSort.priceLowToHigh:
+        sorted.sort((a, b) => a.price.compareTo(b.price));
+        break;
+      case CatalogSort.priceHighToLow:
+        sorted.sort((a, b) => b.price.compareTo(a.price));
+        break;
+      case CatalogSort.areaHighToLow:
+        sorted.sort((a, b) => b.area.compareTo(a.area));
+        break;
+      case CatalogSort.recommended:
+        break;
+    }
+    return sorted;
   }
 }

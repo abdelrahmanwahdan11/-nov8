@@ -34,12 +34,28 @@ class _CatalogPageState extends State<CatalogPage> {
       appBar: AppBar(
         title: Text(l10n.t('catalog')),
         actions: [
+          PopupMenuButton<CatalogSort>(
+            icon: const Icon(Icons.sort),
+            tooltip: l10n.t('sort'),
+            onSelected: (value) => setState(() => notifier.updateSort(value)),
+            itemBuilder: (context) => CatalogSort.values
+                .map(
+                  (value) => CheckedPopupMenuItem<CatalogSort>(
+                    value: value,
+                    checked: notifier.sort == value,
+                    child: Text(_sortLabel(l10n, value)),
+                  ),
+                )
+                .toList(),
+          ),
           IconButton(
             icon: Icon(notifier.listMode ? IconlyLight.category : IconlyLight.menu),
+            tooltip: notifier.listMode ? l10n.t('grid_view') : l10n.t('list_view'),
             onPressed: () => setState(() => notifier.toggleViewMode()),
           ),
           IconButton(
             icon: const Icon(IconlyLight.filter),
+            tooltip: l10n.t('filters'),
             onPressed: () async {
               final filters = await showModalBottomSheet<CatalogFilters>(
                 context: context,
@@ -62,58 +78,202 @@ class _CatalogPageState extends State<CatalogPage> {
               child: SkeletonListCard(),
             );
           }
-          return RefreshIndicator(
-            onRefresh: notifier.refresh,
-            child: notifier.listMode
-                ? PaginationList(
-                    controller: _controller,
-                    itemCount: notifier.visible.length,
-                    itemBuilder: (context, index) {
-                      final property = notifier.visible[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        child: PropertyCard(
-                          property: property,
-                          onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
-                          onFavorite: () => scope.favoritesNotifier.toggle(property.id),
-                          onCompare: () => scope.compareNotifier.toggle(property.id),
-                          isFavorite: scope.favoritesNotifier.isFavorite(property.id),
-                          isCompared: scope.compareNotifier.contains(property.id),
-                        ),
-                      );
-                    },
-                    onLoadMore: notifier.loadMore,
-                    isLoading: notifier.isLoading,
-                  )
-                : NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (!notifier.isLoading && notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
-                        notifier.loadMore();
-                      }
-                      return false;
-                    },
-                    child: GridView.builder(
-                      controller: _controller,
-                      padding: const EdgeInsets.all(24),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 0.7),
-                      itemCount: notifier.visible.length,
-                      itemBuilder: (context, index) {
-                        final property = notifier.visible[index];
-                        return PropertyCard(
-                          property: property,
-                          onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
-                          onFavorite: () => scope.favoritesNotifier.toggle(property.id),
-                          onCompare: () => scope.compareNotifier.toggle(property.id),
-                          isFavorite: scope.favoritesNotifier.isFavorite(property.id),
-                          isCompared: scope.compareNotifier.contains(property.id),
-                        );
-                      },
+
+          final summary = _summarySection(context, notifier, l10n);
+          final theme = Theme.of(context);
+
+          if (notifier.visible.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: notifier.refresh,
+              child: ListView(
+                controller: _controller,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 48),
+                children: [
+                  summary,
+                  const SizedBox(height: 48),
+                  Icon(
+                    Icons.home_work_outlined,
+                    size: 56,
+                    color: theme.colorScheme.primary.withOpacity(0.25),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      l10n.t('no_results'),
+                      style: theme.textTheme.titleMedium,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      l10n.t('no_results_filters'),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                  if (notifier.activeFiltersCount > 0) ...[
+                    const SizedBox(height: 24),
+                    Center(
+                      child: OutlinedButton(
+                        onPressed: notifier.clearFilters,
+                        child: Text(l10n.t('clear_filters')),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }
+
+          if (notifier.listMode) {
+            return RefreshIndicator(
+              onRefresh: notifier.refresh,
+              child: PaginationList(
+                controller: _controller,
+                itemCount: notifier.visible.length,
+                itemBuilder: (context, index) {
+                  final property = notifier.visible[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    child: PropertyCard(
+                      property: property,
+                      onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                      onFavorite: () => scope.favoritesNotifier.toggle(property.id),
+                      onCompare: () => scope.compareNotifier.toggle(property.id),
+                      isFavorite: scope.favoritesNotifier.isFavorite(property.id),
+                      isCompared: scope.compareNotifier.contains(property.id),
+                    ),
+                  );
+                },
+                onLoadMore: notifier.loadMore,
+                isLoading: notifier.isLoading,
+                header: summary,
+                padding: const EdgeInsets.only(bottom: 24),
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: notifier.refresh,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (!notifier.isLoading && notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
+                  notifier.loadMore();
+                }
+                return false;
+              },
+              child: CustomScrollView(
+                controller: _controller,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(child: summary),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    sliver: SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.7,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final property = notifier.visible[index];
+                          return PropertyCard(
+                            property: property,
+                            onTap: () => Navigator.of(context).pushNamed('/details', arguments: property.id),
+                            onFavorite: () => scope.favoritesNotifier.toggle(property.id),
+                            onCompare: () => scope.compareNotifier.toggle(property.id),
+                            isFavorite: scope.favoritesNotifier.isFavorite(property.id),
+                            isCompared: scope.compareNotifier.contains(property.id),
+                          );
+                        },
+                        childCount: notifier.visible.length,
+                      ),
+                    ),
+                  ),
+                  if (notifier.isLoading)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           );
         },
       ),
     );
+  }
+
+  Widget _summarySection(BuildContext context, CatalogNotifier notifier, AppLocalizations l10n) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+      child: _buildSummary(context, notifier, l10n),
+    );
+  }
+
+  Widget _buildSummary(BuildContext context, CatalogNotifier notifier, AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final resultsLabel = l10n.t('catalog_results').replaceFirst('%d', notifier.visible.length.toString());
+    final sortLabel = _sortLabel(l10n, notifier.sort);
+    final filtersCount = notifier.activeFiltersCount;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(resultsLabel, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _SummaryChip(
+                    icon: Icons.sort,
+                    label: sortLabel,
+                    background: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    iconColor: theme.colorScheme.primary,
+                  ),
+                  if (filtersCount > 0)
+                    _SummaryChip(
+                      icon: Icons.filter_list,
+                      label: l10n.t('filters_active').replaceFirst('%d', filtersCount.toString()),
+                      background: theme.colorScheme.primary.withOpacity(0.12),
+                      iconColor: theme.colorScheme.primary,
+                    ),
+                ],
+              ),
+            ),
+            if (filtersCount > 0)
+              TextButton(
+                onPressed: notifier.clearFilters,
+                child: Text(l10n.t('clear_filters')),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _sortLabel(AppLocalizations l10n, CatalogSort sort) {
+    switch (sort) {
+      case CatalogSort.priceLowToHigh:
+        return l10n.t('sort_price_low');
+      case CatalogSort.priceHighToLow:
+        return l10n.t('sort_price_high');
+      case CatalogSort.areaHighToLow:
+        return l10n.t('sort_area');
+      case CatalogSort.recommended:
+        return l10n.t('sort_recommended');
+    }
   }
 }
 
@@ -259,6 +419,43 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    this.background,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? background;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final effectiveBackground = background ?? theme.colorScheme.surfaceVariant.withOpacity(0.3);
+    final effectiveIconColor = iconColor ?? theme.colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: effectiveBackground,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: effectiveIconColor),
+          const SizedBox(width: 6),
+          Text(label, style: theme.textTheme.labelMedium),
+        ],
       ),
     );
   }

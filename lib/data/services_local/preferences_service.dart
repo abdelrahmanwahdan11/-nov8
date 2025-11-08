@@ -20,6 +20,9 @@ class PreferencesService {
   static const keyAuthEmail = 'auth_email';
   static const keyAuthName = 'auth_name';
   static const keyAuthGuest = 'auth_guest';
+  static const keyCatalogListMode = 'catalog_list_mode';
+  static const keyCatalogSort = 'catalog_sort';
+  static const keyReadNotifications = 'read_notifications';
 
   Future<void> saveLocale(Locale locale) async {
     await _prefs.setString(keyLocale, locale.languageCode);
@@ -86,6 +89,24 @@ class PreferencesService {
     if (value == null) return null;
     return DateTime.tryParse(value);
   }
+
+  Future<void> saveCatalogListMode(bool listMode) async {
+    await _prefs.setBool(keyCatalogListMode, listMode);
+  }
+
+  bool loadCatalogListMode(bool fallback) => _prefs.getBool(keyCatalogListMode) ?? fallback;
+
+  Future<void> saveCatalogSort(String value) async {
+    await _prefs.setString(keyCatalogSort, value);
+  }
+
+  String? loadCatalogSort() => _prefs.getString(keyCatalogSort);
+
+  Future<void> saveReadNotifications(List<String> ids) async {
+    await _prefs.setStringList(keyReadNotifications, ids);
+  }
+
+  List<String> loadReadNotifications() => _prefs.getStringList(keyReadNotifications) ?? <String>[];
 
   Future<void> rememberLogin(String email) async {
     await _prefs.setString(keyRememberEmail, email);

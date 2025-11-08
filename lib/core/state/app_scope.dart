@@ -44,7 +44,14 @@ class _AppScopeState extends State<AppScope> {
     final localeNotifier = LocaleNotifier(locale);
     final favorites = FavoritesNotifier(initial: service.loadFavorites());
     final compare = CompareNotifier(initial: service.loadCompare());
-    final catalog = CatalogNotifier();
+    final storedSort = service.loadCatalogSort();
+    final catalog = CatalogNotifier(
+      initialSort: CatalogSort.values.firstWhere(
+        (value) => value.name == storedSort,
+        orElse: () => CatalogSort.recommended,
+      ),
+      initialListMode: service.loadCatalogListMode(true),
+    );
     final booking = BookingNotifier(selectedDate: service.loadLastBooking());
     final items = ItemsNotifier(items: ItemsNotifier.fromJson(service.loadMyItems()));
     final coach = CoachMarksNotifier(isFirstRun: service.isFirstRun());
@@ -70,6 +77,10 @@ class _AppScopeState extends State<AppScope> {
     });
     compare.addListener(() {
       service.saveCompare(compare.ids);
+    });
+    catalog.addListener(() {
+      service.saveCatalogListMode(catalog.listMode);
+      service.saveCatalogSort(catalog.sort.name);
     });
     booking.addListener(() {
       service.saveLastBooking(booking.selectedDate);
@@ -183,6 +194,7 @@ class AppScopeData extends ChangeNotifier {
     searchNotifier.reset();
     coachMarksNotifier.reset();
     authNotifier.logout();
+    preferencesService.saveReadNotifications(const <String>[]);
   }
 
   @override
