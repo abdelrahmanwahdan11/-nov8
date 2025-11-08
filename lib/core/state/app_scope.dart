@@ -62,7 +62,10 @@ class _AppScopeState extends State<AppScope> {
     );
     final items = ItemsNotifier(items: ItemsNotifier.fromJson(service.loadMyItems()));
     final coach = CoachMarksNotifier(isFirstRun: service.isFirstRun());
-    final search = SearchNotifier(initialRecent: service.loadRecentSearches());
+    final search = SearchNotifier(
+      initialRecent: service.loadRecentSearches(),
+      initialSaved: service.loadSavedSearches(),
+    );
     final storedAuth = service.loadAuthState();
     final storedUser = storedAuth.email != null
         ? AuthUser(name: storedAuth.name ?? 'Explorer', email: storedAuth.email!)
@@ -97,6 +100,7 @@ class _AppScopeState extends State<AppScope> {
     });
     search.addListener(() {
       service.saveRecentSearches(search.recent);
+      service.saveSavedSearches(search.savedSearchStorage);
     });
     items.addListener(() {
       service.saveMyItems(items.toJson());

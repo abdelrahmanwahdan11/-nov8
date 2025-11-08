@@ -14,6 +14,7 @@ class PreferencesService {
   static const keyCompare = 'compare_ids';
   static const keyMyItems = 'my_items_cache';
   static const keyRecentSearches = 'recent_searches';
+  static const keySavedSearches = 'saved_searches';
   static const keyLastBookingDate = 'last_booking';
   static const keyLastBookingReturn = 'last_booking_return';
   static const keyLastBookingSlot = 'last_booking_slot';
@@ -81,6 +82,12 @@ class PreferencesService {
   }
 
   List<String> loadRecentSearches() => _prefs.getStringList(keyRecentSearches) ?? <String>[];
+
+  Future<void> saveSavedSearches(List<String> entries) async {
+    await _prefs.setStringList(keySavedSearches, entries);
+  }
+
+  List<String> loadSavedSearches() => _prefs.getStringList(keySavedSearches) ?? <String>[];
 
   Future<void> saveLastBookingSelection({
     required DateTime start,

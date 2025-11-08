@@ -19,6 +19,135 @@ class _SearchPageState extends State<SearchPage> {
 
   bool _initialized = false;
 
+  Future<void> _saveCurrentSearch(BuildContext context, SearchNotifier notifier, AppLocalizations l10n) async {
+    if (!notifier.canSaveCurrent) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    final suggested = notifier.suggestedLabelForCurrent();
+    final initial = suggested == 'Search' ? l10n.t('search') : suggested;
+    final label = await _promptForLabel(
+      context: context,
+      title: l10n.t('save_search'),
+      initialValue: initial,
+      l10n: l10n,
+    );
+    if (label == null) {
+      return;
+    }
+    final result = notifier.saveCurrent(label: label);
+    final messageKey = result.isUpdate ? 'saved_search_updated' : 'saved_search_created';
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t(messageKey))),
+    );
+  }
+
+  Future<String?> _promptForLabel({
+    required BuildContext context,
+    required String title,
+    required String initialValue,
+    required AppLocalizations l10n,
+  }) {
+    final controller = TextEditingController(text: initialValue);
+    return showDialog<String>(
+      context: context,
+      builder: (context) {
+        String? errorText;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(title),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: l10n.t('save_search_placeholder'),
+                  errorText: errorText,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.t('cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final value = controller.text.trim();
+                    if (value.isEmpty) {
+                      setState(() => errorText = l10n.t('save_search_required'));
+                      return;
+                    }
+                    Navigator.of(context).pop(value);
+                  },
+                  child: Text(l10n.t('save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _applySavedSearch(BuildContext context, SearchNotifier notifier, SavedSearchEntry entry, AppLocalizations l10n) {
+    notifier.applySavedSearch(entry.id);
+    _controller.text = notifier.query;
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('saved_search_applied'))),
+    );
+  }
+
+  Future<void> _renameSavedSearch(
+    BuildContext context,
+    SearchNotifier notifier,
+    SavedSearchEntry entry,
+    AppLocalizations l10n,
+  ) async {
+    final label = await _promptForLabel(
+      context: context,
+      title: l10n.t('rename_saved_search'),
+      initialValue: entry.label,
+      l10n: l10n,
+    );
+    if (label == null) {
+      return;
+    }
+    if (notifier.renameSavedSearch(entry.id, label) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('saved_search_updated'))),
+      );
+    }
+  }
+
+  void _deleteSavedSearch(
+    BuildContext context,
+    SearchNotifier notifier,
+    SavedSearchEntry entry,
+    AppLocalizations l10n,
+  ) {
+    if (notifier.deleteSavedSearch(entry.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('saved_search_deleted'))),
+      );
+    }
+  }
+
+  String _describeSavedSearch(SavedSearchEntry entry) {
+    final pieces = <String>[];
+    if (entry.query.trim().isNotEmpty) {
+      pieces.add('“${entry.query.trim()}”');
+    }
+    if (entry.city != null && entry.city!.isNotEmpty) {
+      pieces.add(entry.city!);
+    }
+    if (entry.tag != null && entry.tag!.isNotEmpty) {
+      pieces.add('#${entry.tag!}');
+    }
+    return pieces.isEmpty ? '' : pieces.join(' · ');
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -55,6 +184,31 @@ class _SearchPageState extends State<SearchPage> {
                   isLoading: notifier.isLoading,
                 ),
               ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: notifier.canSaveCurrent
+                    ? Padding(
+                        key: const ValueKey('save_search_row'),
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.t('save_search_hint'),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FilledButton.icon(
+                              onPressed: () => _saveCurrentSearch(context, notifier, l10n),
+                              icon: const Icon(Icons.bookmark_add_outlined),
+                              label: Text(l10n.t('save_search')),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
               _SummaryBar(
                 query: notifier.query,
                 isLoading: notifier.isLoading,
@@ -73,6 +227,66 @@ class _SearchPageState extends State<SearchPage> {
                     : _RefinementSection(
                         key: const ValueKey('refinement_section'),
                         notifier: notifier,
+                      ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: notifier.savedSearches.isEmpty
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        key: const ValueKey('saved_searches_section'),
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.t('saved_searches'),
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            ...notifier.savedSearches.map((entry) {
+                              final subtitle = _describeSavedSearch(entry);
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: ListTile(
+                                  leading: const Icon(Icons.bookmark_outline),
+                                  title: Text(entry.label),
+                                  subtitle: subtitle.isEmpty ? null : Text(subtitle),
+                                  onTap: () => _applySavedSearch(context, notifier, entry, l10n),
+                                  trailing: PopupMenuButton<_SavedSearchMenu>(
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case _SavedSearchMenu.apply:
+                                          _applySavedSearch(context, notifier, entry, l10n);
+                                          break;
+                                        case _SavedSearchMenu.rename:
+                                          _renameSavedSearch(context, notifier, entry, l10n);
+                                          break;
+                                        case _SavedSearchMenu.delete:
+                                          _deleteSavedSearch(context, notifier, entry, l10n);
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: _SavedSearchMenu.apply,
+                                        child: Text(l10n.t('apply_saved_search')),
+                                      ),
+                                      PopupMenuItem(
+                                        value: _SavedSearchMenu.rename,
+                                        child: Text(l10n.t('rename_saved_search')),
+                                      ),
+                                      PopupMenuItem(
+                                        value: _SavedSearchMenu.delete,
+                                        child: Text(l10n.t('delete_saved_search')),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
                       ),
               ),
               if (notifier.recent.isNotEmpty)
@@ -288,3 +502,5 @@ class _RefinementSection extends StatelessWidget {
     );
   }
 }
+
+enum _SavedSearchMenu { apply, rename, delete }
