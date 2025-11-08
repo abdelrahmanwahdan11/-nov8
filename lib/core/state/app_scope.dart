@@ -53,7 +53,13 @@ class _AppScopeState extends State<AppScope> {
       ),
       initialListMode: service.loadCatalogListMode(true),
     );
-    final booking = BookingNotifier(selectedDate: service.loadLastBooking());
+    final storedBooking = service.loadLastBookingSelection();
+    final booking = BookingNotifier(
+      preferences: service,
+      selectedDate: storedBooking.start,
+      returnDate: storedBooking.end,
+      selectedSlot: storedBooking.slot,
+    );
     final items = ItemsNotifier(items: ItemsNotifier.fromJson(service.loadMyItems()));
     final coach = CoachMarksNotifier(isFirstRun: service.isFirstRun());
     final search = SearchNotifier(initialRecent: service.loadRecentSearches());
@@ -83,9 +89,6 @@ class _AppScopeState extends State<AppScope> {
     catalog.addListener(() {
       service.saveCatalogListMode(catalog.listMode);
       service.saveCatalogSort(catalog.sort.name);
-    });
-    booking.addListener(() {
-      service.saveLastBooking(booking.selectedDate);
     });
     coach.addListener(() {
       if (!coach.shouldShow) {

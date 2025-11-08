@@ -32,17 +32,24 @@ List<NotificationDescriptor> buildNotifications({
 }) {
   final items = <NotificationDescriptor>[];
 
-  final booking = scope.bookingNotifier.selectedDate;
-  if (booking != null) {
-    final dateLabel =
-        '${material.formatMediumDate(booking)} • ${material.formatTimeOfDay(TimeOfDay.fromDateTime(booking))}';
+  final bookingNotifier = scope.bookingNotifier;
+  final start = bookingNotifier.selectedDate;
+  final end = bookingNotifier.returnDate;
+  final rangeLabel = l10n
+      .t('booking_range_label')
+      .replaceFirst('%s', material.formatMediumDate(start))
+      .replaceFirst('%s', material.formatMediumDate(end));
+  final slotLabel = bookingNotifier.selectedSlot != null
+      ? ' • ${l10n.t('booking_slot_label').replaceFirst('%s', bookingNotifier.selectedSlot!)}'
+      : '';
+  if (bookingNotifier.selectedSlot != null) {
     items.add(
       NotificationDescriptor(
-        id: 'booking_${booking.toIso8601String()}',
-        title: l10n.t('notification_booking_set').replaceFirst('%s', dateLabel),
+        id: 'booking_${start.toIso8601String()}_${end.toIso8601String()}_${bookingNotifier.selectedSlot}',
+        title: l10n.t('notification_booking_set').replaceFirst('%s', '$rangeLabel$slotLabel'),
         icon: Icons.calendar_month,
-        timestamp: booking,
-        timestampLabel: material.formatShortDate(booking),
+        timestamp: start,
+        timestampLabel: material.formatShortDate(start),
       ),
     );
   }

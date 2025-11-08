@@ -15,6 +15,8 @@ class PreferencesService {
   static const keyMyItems = 'my_items_cache';
   static const keyRecentSearches = 'recent_searches';
   static const keyLastBookingDate = 'last_booking';
+  static const keyLastBookingReturn = 'last_booking_return';
+  static const keyLastBookingSlot = 'last_booking_slot';
   static const keyRememberEmail = 'remember_email';
   static const keyRememberFlag = 'remember_flag';
   static const keyAuthEmail = 'auth_email';
@@ -80,14 +82,29 @@ class PreferencesService {
 
   List<String> loadRecentSearches() => _prefs.getStringList(keyRecentSearches) ?? <String>[];
 
-  Future<void> saveLastBooking(DateTime date) async {
-    await _prefs.setString(keyLastBookingDate, date.toIso8601String());
+  Future<void> saveLastBookingSelection({
+    required DateTime start,
+    required DateTime end,
+    String? slot,
+  }) async {
+    await _prefs.setString(keyLastBookingDate, start.toIso8601String());
+    await _prefs.setString(keyLastBookingReturn, end.toIso8601String());
+    if (slot != null) {
+      await _prefs.setString(keyLastBookingSlot, slot);
+    } else {
+      await _prefs.remove(keyLastBookingSlot);
+    }
   }
 
-  DateTime? loadLastBooking() {
-    final value = _prefs.getString(keyLastBookingDate);
-    if (value == null) return null;
-    return DateTime.tryParse(value);
+  StoredBookingSelection loadLastBookingSelection() {
+    final startRaw = _prefs.getString(keyLastBookingDate);
+    final endRaw = _prefs.getString(keyLastBookingReturn);
+    final slot = _prefs.getString(keyLastBookingSlot);
+    return StoredBookingSelection(
+      start: startRaw != null ? DateTime.tryParse(startRaw) : null,
+      end: endRaw != null ? DateTime.tryParse(endRaw) : null,
+      slot: slot,
+    );
   }
 
   Future<void> saveCatalogListMode(bool listMode) async {
@@ -158,4 +175,12 @@ class StoredAuthState {
   final String? name;
   final String? email;
   final bool isGuest;
+}
+
+class StoredBookingSelection {
+  const StoredBookingSelection({this.start, this.end, this.slot});
+
+  final DateTime? start;
+  final DateTime? end;
+  final String? slot;
 }
