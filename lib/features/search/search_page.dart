@@ -6,6 +6,7 @@ import '../../core/state/notifiers/search_notifier.dart';
 import '../../core/widgets/property_card.dart';
 import '../../core/widgets/search_bar_x.dart';
 import '../../core/widgets/skeleton.dart';
+import '../../data/models/property.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -134,20 +135,6 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  String _describeSavedSearch(SavedSearchEntry entry) {
-    final pieces = <String>[];
-    if (entry.query.trim().isNotEmpty) {
-      pieces.add('“${entry.query.trim()}”');
-    }
-    if (entry.city != null && entry.city!.isNotEmpty) {
-      pieces.add(entry.city!);
-    }
-    if (entry.tag != null && entry.tag!.isNotEmpty) {
-      pieces.add('#${entry.tag!}');
-    }
-    return pieces.isEmpty ? '' : pieces.join(' · ');
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -231,7 +218,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
-                child: notifier.savedSearches.isEmpty
+                child: notifier.savedSnapshots.isEmpty
                     ? const SizedBox.shrink()
                     : Padding(
                         key: const ValueKey('saved_searches_section'),
@@ -240,51 +227,24 @@ class _SearchPageState extends State<SearchPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              l10n.t('saved_searches'),
+                              l10n.t('saved_search_highlights'),
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             const SizedBox(height: 8),
-                            ...notifier.savedSearches.map((entry) {
-                              final subtitle = _describeSavedSearch(entry);
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: ListTile(
-                                  leading: const Icon(Icons.bookmark_outline),
-                                  title: Text(entry.label),
-                                  subtitle: subtitle.isEmpty ? null : Text(subtitle),
-                                  onTap: () => _applySavedSearch(context, notifier, entry, l10n),
-                                  trailing: PopupMenuButton<_SavedSearchMenu>(
-                                    onSelected: (value) {
-                                      switch (value) {
-                                        case _SavedSearchMenu.apply:
-                                          _applySavedSearch(context, notifier, entry, l10n);
-                                          break;
-                                        case _SavedSearchMenu.rename:
-                                          _renameSavedSearch(context, notifier, entry, l10n);
-                                          break;
-                                        case _SavedSearchMenu.delete:
-                                          _deleteSavedSearch(context, notifier, entry, l10n);
-                                          break;
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: _SavedSearchMenu.apply,
-                                        child: Text(l10n.t('apply_saved_search')),
-                                      ),
-                                      PopupMenuItem(
-                                        value: _SavedSearchMenu.rename,
-                                        child: Text(l10n.t('rename_saved_search')),
-                                      ),
-                                      PopupMenuItem(
-                                        value: _SavedSearchMenu.delete,
-                                        child: Text(l10n.t('delete_saved_search')),
-                                      ),
-                                    ],
-                                  ),
+                            ...notifier.savedSnapshots.map(
+                              (snapshot) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _SavedSearchCard(
+                                  snapshot: snapshot,
+                                  onApply: () =>
+                                      _applySavedSearch(context, notifier, snapshot.entry, l10n),
+                                  onRename: () =>
+                                      _renameSavedSearch(context, notifier, snapshot.entry, l10n),
+                                  onDelete: () =>
+                                      _deleteSavedSearch(context, notifier, snapshot.entry, l10n),
                                 ),
-                              );
-                            }),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -351,6 +311,167 @@ class _SearchPageState extends State<SearchPage> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _SavedSearchCard extends StatelessWidget {
+  const _SavedSearchCard({
+    required this.snapshot,
+    required this.onApply,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  final SavedSearchSnapshot snapshot;
+  final VoidCallback onApply;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final entry = snapshot.entry;
+    final preview = snapshot.matches.take(3).toList();
+    final description = entry.describe();
+    final totalLabel =
+        l10n.t('saved_search_total_label').replaceFirst('%d', snapshot.matches.length.toString());
+    final badgeLabel =
+        l10n.t('saved_search_new_badge').replaceFirst('%d', snapshot.unseenCount.toString());
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entry.label, style: theme.textTheme.titleMedium),
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(description, style: theme.textTheme.bodySmall),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuButton<_SavedSearchMenu>(
+                  tooltip: l10n.t('saved_search_manage'),
+                  onSelected: (value) {
+                    switch (value) {
+                      case _SavedSearchMenu.apply:
+                        onApply();
+                        break;
+                      case _SavedSearchMenu.rename:
+                        onRename();
+                        break;
+                      case _SavedSearchMenu.delete:
+                        onDelete();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: _SavedSearchMenu.apply,
+                      child: Text(l10n.t('apply_saved_search')),
+                    ),
+                    PopupMenuItem(
+                      value: _SavedSearchMenu.rename,
+                      child: Text(l10n.t('rename_saved_search')),
+                    ),
+                    PopupMenuItem(
+                      value: _SavedSearchMenu.delete,
+                      child: Text(l10n.t('delete_saved_search')),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (preview.isEmpty)
+              Container(
+                height: 96,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.25),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  l10n.t('saved_search_preview_empty'),
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              _SavedSearchPreviewStrip(matches: preview),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(totalLabel, style: theme.textTheme.labelLarge),
+                if (snapshot.unseenCount > 0) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      badgeLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: onApply,
+                  icon: const Icon(Icons.open_in_new),
+                  label: Text(l10n.t('saved_search_preview_button')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedSearchPreviewStrip extends StatelessWidget {
+  const _SavedSearchPreviewStrip({required this.matches});
+
+  final List<Property> matches;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 110,
+      child: Row(
+        children: List.generate(matches.length, (index) {
+          final property = matches[index];
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: index == matches.length - 1 ? 0 : 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.network(
+                  property.images.first,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

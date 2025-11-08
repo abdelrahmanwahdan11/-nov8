@@ -3,6 +3,7 @@ import 'package:iconly/iconly.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/state/app_scope.dart';
+import '../../core/state/notifiers/search_notifier.dart';
 import '../../core/widgets/coach_marks.dart';
 import '../../core/widgets/compare_tray.dart';
 import '../../core/widgets/property_card.dart';
@@ -238,6 +239,47 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
+            AnimatedBuilder(
+              animation: scope.searchNotifier,
+              builder: (context, _) {
+                final highlights = scope.searchNotifier.savedSnapshots;
+                if (highlights.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                final previewList = highlights.take(4).toList();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    Text(
+                      l10n.t('saved_search_quick_title'),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 210,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: previewList.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final snapshot = previewList[index];
+                          return _SavedSearchQuickCard(
+                            snapshot: snapshot,
+                            onTap: () {
+                              scope.searchNotifier.applySavedSearch(snapshot.entry.id);
+                              Navigator.of(context).pushNamed('/search');
+                            },
+                            onManage: () => Navigator.of(context).pushNamed('/search'),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 20),
             _FeatureChips(
               key: _chipsKey,
@@ -376,6 +418,115 @@ class _HomePageState extends State<HomePage> {
             onOpen: () => Navigator.of(context).pushNamed('/compare'),
           );
         },
+      ),
+    );
+  }
+}
+
+class _SavedSearchQuickCard extends StatelessWidget {
+  const _SavedSearchQuickCard({
+    required this.snapshot,
+    required this.onTap,
+    required this.onManage,
+  });
+
+  final SavedSearchSnapshot snapshot;
+  final VoidCallback onTap;
+  final VoidCallback onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final preview = snapshot.matches.isEmpty ? null : snapshot.matches.first;
+    final description = snapshot.entry.describe();
+    final badgeLabel =
+        l10n.t('saved_search_new_badge').replaceFirst('%d', snapshot.unseenCount.toString());
+    final totalLabel =
+        l10n.t('saved_search_total_label').replaceFirst('%d', snapshot.matches.length.toString());
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: 220,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: theme.dividerColor.withOpacity(0.08)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: preview != null
+                  ? AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Image.network(preview.images.first, fit: BoxFit.cover),
+                    )
+                  : Container(
+                      height: 90,
+                      color: theme.colorScheme.surfaceVariant.withOpacity(0.2),
+                      alignment: Alignment.center,
+                      child: Icon(Icons.search, color: theme.colorScheme.primary.withOpacity(0.6)),
+                    ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    snapshot.entry.label,
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.tune, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: onManage,
+                  tooltip: l10n.t('saved_search_manage'),
+                ),
+              ],
+            ),
+            if (description.isNotEmpty)
+              Text(
+                description,
+                style: theme.textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (snapshot.unseenCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      badgeLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                else
+                  Text(totalLabel, style: theme.textTheme.labelSmall),
+                const Spacer(),
+                Icon(Icons.arrow_forward, color: theme.colorScheme.primary),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

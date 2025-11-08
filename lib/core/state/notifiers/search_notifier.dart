@@ -20,6 +20,7 @@ class SearchNotifier extends ChangeNotifier {
         _matches = List<Property>.from(MockData.properties),
         _results = List<Property>.from(MockData.properties) {
     _refreshFacets();
+    _refreshSavedSearchSnapshots();
   }
 
   final List<String> _recent;
@@ -37,6 +38,7 @@ class SearchNotifier extends ChangeNotifier {
   String? _activeCity;
   String? _activeCityNormalized;
   final List<SavedSearchEntry> _savedSearches;
+  List<SavedSearchSnapshot> _savedSnapshots = const [];
 
   String get query => _query;
   List<Property> get results => _results;
@@ -47,6 +49,7 @@ class SearchNotifier extends ChangeNotifier {
   int get activeRefinementCount =>
       (_activeTagNormalized != null ? 1 : 0) + (_activeCityNormalized != null ? 1 : 0);
   List<SavedSearchEntry> get savedSearches => List.unmodifiable(_savedSearches);
+  List<SavedSearchSnapshot> get savedSnapshots => List.unmodifiable(_savedSnapshots);
   List<String> get savedSearchStorage =>
       _savedSearches.map((entry) => entry.toStorageString()).toList(growable: false);
   bool get canSaveCurrent =>
@@ -94,10 +97,14 @@ class SearchNotifier extends ChangeNotifier {
     final now = DateTime.now();
     final targetLabel = (label ?? '').trim().isNotEmpty ? label!.trim() : _defaultLabelForCurrent(trimmed);
 
+    final seenIds = _limitPropertyIds(_results);
+
     if (existingIndex != -1) {
-      final updated = _savedSearches[existingIndex].copyWith(label: targetLabel, savedAt: now);
+      final updated = _savedSearches[existingIndex]
+          .copyWith(label: targetLabel, savedAt: now, lastSeenPropertyIds: seenIds);
       _savedSearches[existingIndex] = updated;
       _sortSavedSearches();
+      _refreshSavedSearchSnapshots();
       notifyListeners();
       return SavedSearchSaveResult(entry: updated, isUpdate: true);
     }
@@ -112,12 +119,14 @@ class SearchNotifier extends ChangeNotifier {
       normalizedQuery: normalizedQuery,
       normalizedTag: normalizedTag,
       normalizedCity: normalizedCity,
+      lastSeenPropertyIds: seenIds,
     );
     _savedSearches.insert(0, entry);
     if (_savedSearches.length > 12) {
       _savedSearches.removeRange(12, _savedSearches.length);
     }
     _sortSavedSearches();
+    _refreshSavedSearchSnapshots();
     notifyListeners();
     return SavedSearchSaveResult(entry: entry, isUpdate: false);
   }
@@ -134,6 +143,7 @@ class SearchNotifier extends ChangeNotifier {
     final updated = _savedSearches[index].copyWith(label: trimmed, savedAt: DateTime.now());
     _savedSearches[index] = updated;
     _sortSavedSearches();
+    _refreshSavedSearchSnapshots();
     notifyListeners();
     return true;
   }
@@ -144,6 +154,7 @@ class SearchNotifier extends ChangeNotifier {
     if (before == _savedSearches.length) {
       return false;
     }
+    _refreshSavedSearchSnapshots();
     notifyListeners();
     return true;
   }
@@ -191,6 +202,18 @@ class SearchNotifier extends ChangeNotifier {
       if (_recent.length > 6) {
         _recent.removeLast();
       }
+    }
+
+    final updatedMatches = List<Property>.from(_results);
+    final seenIds = _limitPropertyIds(updatedMatches);
+    final index = _savedSearches.indexWhere((candidate) => candidate.id == entry.id);
+    if (index != -1) {
+      _savedSearches[index] = entry.copyWith(
+        savedAt: DateTime.now(),
+        lastSeenPropertyIds: seenIds,
+      );
+      _sortSavedSearches();
+      _refreshSavedSearchSnapshots();
     }
 
     notifyListeners();
@@ -344,6 +367,7 @@ class SearchNotifier extends ChangeNotifier {
     _recent.clear();
     _isLoading = false;
     _savedSearches.clear();
+    _savedSnapshots = const [];
     notifyListeners();
   }
 
@@ -357,6 +381,66 @@ class SearchNotifier extends ChangeNotifier {
     _matches = List<Property>.from(matches);
     _refreshFacets();
     _applyFilters();
+  }
+
+  List<String> _limitPropertyIds(List<Property> matches, {int limit = 32}) {
+    if (matches.isEmpty) {
+      return const [];
+    }
+    final ids = <String>[];
+    for (final property in matches) {
+      if (!ids.contains(property.id)) {
+        ids.add(property.id);
+      }
+      if (ids.length >= limit) {
+        break;
+      }
+    }
+    return ids;
+  }
+
+  void _refreshSavedSearchSnapshots() {
+    if (_savedSearches.isEmpty) {
+      _savedSnapshots = const [];
+      return;
+    }
+    final snapshots = <SavedSearchSnapshot>[];
+    for (final entry in _savedSearches) {
+      final matches = List<Property>.from(_matchesForEntry(entry));
+      final seen = entry.lastSeenPropertyIds.toSet();
+      final unseen = matches.where((property) => !seen.contains(property.id)).length;
+      snapshots.add(
+        SavedSearchSnapshot(
+          entry: entry,
+          matches: List<Property>.unmodifiable(matches),
+          unseenCount: unseen,
+        ),
+      );
+    }
+    _savedSnapshots = snapshots;
+  }
+
+  List<Property> _matchesForEntry(SavedSearchEntry entry) {
+    Iterable<_IndexedProperty> candidates = _indexed;
+    if (entry.normalizedQuery.isNotEmpty) {
+      candidates = candidates.where((candidate) => candidate.index.contains(entry.normalizedQuery));
+    }
+    final results = <Property>[];
+    final seen = <String>{};
+    for (final candidate in candidates) {
+      final property = candidate.property;
+      if (entry.normalizedTag != null &&
+          !property.tags.any((tag) => normalizeText(tag) == entry.normalizedTag)) {
+        continue;
+      }
+      if (entry.normalizedCity != null && normalizeText(property.city) != entry.normalizedCity) {
+        continue;
+      }
+      if (seen.add(property.id)) {
+        results.add(property);
+      }
+    }
+    return results;
   }
 
   String _defaultLabelForCurrent(String trimmedQuery) {
@@ -503,6 +587,18 @@ String _composeIndex(Property property) {
   return normalizeText(buffer.toString());
 }
 
+class SavedSearchSnapshot {
+  const SavedSearchSnapshot({
+    required this.entry,
+    required this.matches,
+    required this.unseenCount,
+  });
+
+  final SavedSearchEntry entry;
+  final List<Property> matches;
+  final int unseenCount;
+}
+
 class SavedSearchEntry {
   const SavedSearchEntry({
     required this.id,
@@ -514,6 +610,7 @@ class SavedSearchEntry {
     required this.normalizedQuery,
     this.normalizedTag,
     this.normalizedCity,
+    this.lastSeenPropertyIds = const [],
   });
 
   const SavedSearchEntry._empty()
@@ -525,7 +622,8 @@ class SavedSearchEntry {
         savedAt = DateTime.fromMillisecondsSinceEpoch(0),
         normalizedQuery = '',
         normalizedTag = null,
-        normalizedCity = null;
+        normalizedCity = null,
+        lastSeenPropertyIds = const [];
 
   final String id;
   final String label;
@@ -536,10 +634,16 @@ class SavedSearchEntry {
   final String normalizedQuery;
   final String? normalizedTag;
   final String? normalizedCity;
+  final List<String> lastSeenPropertyIds;
 
   static SavedSearchEntry empty() => const SavedSearchEntry._empty();
 
-  SavedSearchEntry copyWith({String? label, DateTime? savedAt}) => SavedSearchEntry(
+  SavedSearchEntry copyWith({
+    String? label,
+    DateTime? savedAt,
+    List<String>? lastSeenPropertyIds,
+  }) =>
+      SavedSearchEntry(
         id: id,
         label: label ?? this.label,
         query: query,
@@ -549,7 +653,23 @@ class SavedSearchEntry {
         normalizedQuery: normalizedQuery,
         normalizedTag: normalizedTag,
         normalizedCity: normalizedCity,
+        lastSeenPropertyIds:
+            lastSeenPropertyIds != null ? List<String>.from(lastSeenPropertyIds) : List<String>.from(this.lastSeenPropertyIds),
       );
+
+  String describe() {
+    final pieces = <String>[];
+    if (query.trim().isNotEmpty) {
+      pieces.add('“${query.trim()}”');
+    }
+    if (city != null && city!.isNotEmpty) {
+      pieces.add(city!);
+    }
+    if (tag != null && tag!.isNotEmpty) {
+      pieces.add('#${tag!}');
+    }
+    return pieces.join(' · ');
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -558,6 +678,7 @@ class SavedSearchEntry {
         'tag': tag,
         'city': city,
         'savedAt': savedAt.millisecondsSinceEpoch,
+        'seen': lastSeenPropertyIds,
       };
 
   String toStorageString() => jsonEncode(toJson());
@@ -575,6 +696,15 @@ class SavedSearchEntry {
     } else {
       savedAt = DateTime.now();
     }
+    final seenRaw = json['seen'];
+    final seen = <String>[];
+    if (seenRaw is List) {
+      for (final value in seenRaw) {
+        if (value is String && value.isNotEmpty) {
+          seen.add(value);
+        }
+      }
+    }
     return SavedSearchEntry(
       id: (json['id'] as String?) ?? DateTime.now().microsecondsSinceEpoch.toString(),
       label: (json['label'] as String?)?.trim().isNotEmpty == true
@@ -587,6 +717,7 @@ class SavedSearchEntry {
       normalizedQuery: normalizeText(query),
       normalizedTag: tag != null ? normalizeText(tag) : null,
       normalizedCity: city != null ? normalizeText(city) : null,
+      lastSeenPropertyIds: seen,
     );
   }
 
