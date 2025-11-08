@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
@@ -21,7 +23,13 @@ class CoachMarksOverlay {
   int _index = 0;
 
   void show() {
-    if (steps.isEmpty) return;
+    if (steps.isEmpty || _entry != null) {
+      return;
+    }
+    final overlay = Overlay.of(context, rootOverlay: true);
+    if (overlay == null) {
+      return;
+    }
     _entry = OverlayEntry(builder: (context) {
       return _CoachMarkContent(
         step: steps[_index],
@@ -31,8 +39,7 @@ class CoachMarksOverlay {
         onSkip: dismiss,
       );
     });
-    final overlay = Overlay.of(context);
-    overlay?.insert(_entry!);
+    overlay.insert(_entry!);
   }
 
   bool _completed = false;
@@ -47,8 +54,10 @@ class CoachMarksOverlay {
   }
 
   void dismiss() {
-    _entry?.remove();
-    _entry = null;
+    if (_entry != null) {
+      _entry!.remove();
+      _entry = null;
+    }
     if (!_completed) {
       _completed = true;
       onComplete();
@@ -78,6 +87,20 @@ class _CoachMarkContentState extends State<_CoachMarkContent> with SingleTickerP
     targetRect = _findRect();
   }
 
+  @override
+  void didUpdateWidget(covariant _CoachMarkContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.step.key != widget.step.key) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            targetRect = _findRect();
+          });
+        }
+      });
+    }
+  }
+
   Rect _findRect() {
     final renderObject = widget.step.key.currentContext?.findRenderObject();
     if (renderObject is RenderBox) {
@@ -92,6 +115,17 @@ class _CoachMarkContentState extends State<_CoachMarkContent> with SingleTickerP
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     targetRect = _findRect();
+    final media = MediaQuery.of(context);
+    const cardHeightEstimate = 220.0;
+    final hasTarget = !targetRect.isEmpty;
+    final defaultTop = media.size.height * 0.4;
+    double top = hasTarget ? targetRect.bottom + 24 : defaultTop;
+    if (top + cardHeightEstimate > media.size.height - 24) {
+      final fallbackTop = hasTarget ? targetRect.top - cardHeightEstimate - 24 : media.size.height / 2 - cardHeightEstimate / 2;
+      top = fallbackTop.clamp(24.0, math.max(24.0, media.size.height - cardHeightEstimate - 24));
+    }
+    final double rawLeft = hasTarget ? targetRect.left : 24;
+    final double clampedLeft = rawLeft.clamp(24.0, math.max(24.0, media.size.width - 340));
     return Material(
       color: Colors.black54,
       child: Stack(
@@ -102,8 +136,8 @@ class _CoachMarkContentState extends State<_CoachMarkContent> with SingleTickerP
             ),
           ),
           Positioned(
-            top: targetRect.bottom + 24,
-            left: targetRect.left,
+            top: top,
+            left: clampedLeft,
             right: 24,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 340),

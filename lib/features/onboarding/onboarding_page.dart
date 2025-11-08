@@ -39,17 +39,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _index = (_index + 1) % _pages.length;
-        _controller.animateToPage(
-          _index,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        );
-      });
-    });
+    _startAutoPlay();
   }
 
   @override
@@ -59,7 +49,37 @@ class _OnboardingPageState extends State<OnboardingPage> {
     super.dispose();
   }
 
+  void _startAutoPlay() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final nextIndex = (_index + 1) % _pages.length;
+      _controller.animateToPage(
+        nextIndex,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  void _goTo(int index) {
+    _controller.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _next() {
+    if (_index >= _pages.length - 1) {
+      _finish();
+    } else {
+      _goTo(_index + 1);
+    }
+  }
+
   void _finish() {
+    _timer?.cancel();
     final scope = AppScope.of(context);
     scope.preferencesService.setFirstRunDone();
     Navigator.of(context).pushReplacementNamed('/auth/login');
@@ -71,10 +91,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
     final theme = Theme.of(context);
     return Scaffold(
       body: Stack(
+        fit: StackFit.expand,
         children: [
           PageView.builder(
             controller: _controller,
-            onPageChanged: (i) => setState(() => _index = i),
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (i) {
+              setState(() => _index = i);
+              _startAutoPlay();
+            },
             itemCount: _pages.length,
             itemBuilder: (context, index) {
               final data = _pages[index];
@@ -82,8 +107,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 fit: StackFit.expand,
                 children: [
                   Image.network(data.image, fit: BoxFit.cover),
-                  Container(
-                    decoration: const BoxDecoration(
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Colors.black87, Colors.transparent],
                         begin: Alignment.bottomCenter,
@@ -91,67 +116,83 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 80),
-                        Text(
-                          l10n.t(data.titleKey),
-                          style: GoogleFonts.urbanist(
-                            textStyle: theme.textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          l10n.t(data.messageKey),
-                          style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: List.generate(
-                            _pages.length,
-                            (i) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              margin: const EdgeInsets.only(right: 6),
-                              height: 6,
-                              width: _index == i ? 24 : 8,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(_index == i ? 1 : 0.4),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            TextButton(
-                              onPressed: _finish,
-                              child: Text(l10n.t('skip'), style: const TextStyle(color: Colors.white)),
-                            ),
-                            const Spacer(),
-                            ElevatedButton(
-                              onPressed: _finish,
-                              child: Text(_index == _pages.length - 1 ? l10n.t('get_started') : l10n.t('next')),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
                 ],
               );
             },
           ),
-          Positioned(
-            top: 48,
-            right: 24,
-            child: TextButton(
-              onPressed: _finish,
-              child: Text(l10n.t('login'), style: const TextStyle(color: Colors.white)),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: TextButton(
+                      onPressed: _finish,
+                      child: Text(l10n.t('login'), style: const TextStyle(color: Colors.white)),
+                    ),
+                  ),
+                  const Spacer(),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: Column(
+                      key: ValueKey(_pages[_index].titleKey),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.t(_pages[_index].titleKey),
+                          style: GoogleFonts.urbanist(
+                            textStyle: theme.textTheme.displayMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l10n.t(_pages[_index].messageKey),
+                          style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: List.generate(
+                      _pages.length,
+                      (i) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsetsDirectional.only(end: 6),
+                        height: 6,
+                        width: _index == i ? 24 : 8,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(_index == i ? 1 : 0.4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: _finish,
+                        child: Text(l10n.t('skip'), style: const TextStyle(color: Colors.white)),
+                      ),
+                      const Spacer(),
+                      ElevatedButton(
+                        onPressed: _next,
+                        child: Text(
+                          _index == _pages.length - 1 ? l10n.t('get_started') : l10n.t('next'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],

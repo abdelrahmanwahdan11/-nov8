@@ -29,6 +29,7 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey _bookKey = GlobalKey();
 
   String _selectedChip = 'all';
+  CoachMarksOverlay? _coachOverlay;
 
   @override
   void initState() {
@@ -37,7 +38,8 @@ class _HomePageState extends State<HomePage> {
       final scope = AppScope.of(context);
       if (scope.coachMarksNotifier.shouldShow) {
         final l10n = AppLocalizations.of(context);
-        final overlay = CoachMarksOverlay(
+        _coachOverlay?.dismiss();
+        _coachOverlay = CoachMarksOverlay(
           context: context,
           steps: [
             CoachMarkStep(
@@ -68,9 +70,10 @@ class _HomePageState extends State<HomePage> {
           ],
           onComplete: () {
             scope.coachMarksNotifier.complete();
+            _coachOverlay = null;
           },
-        );
-        overlay.show();
+        )
+          ..show();
       }
     });
   }
@@ -78,22 +81,22 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _coachOverlay?.dismiss();
     super.dispose();
   }
 
-  List<Property> _filteredProperties() {
-    final all = MockData.properties;
+  List<Property> _filteredProperties(List<Property> source) {
     switch (_selectedChip) {
       case 'best_offer':
-        return all.where((p) => p.price < 2000000).toList();
+        return source.where((p) => p.price < 2000000).toList();
       case 'for_sale':
-        return all;
+        return List<Property>.from(source);
       case 'for_rent':
-        return all.where((p) => p.tags.contains('deal')).toList();
+        return source.where((p) => p.tags.contains('deal')).toList();
       case 'mortgage':
-        return all.where((p) => p.mortgageEligible).toList();
+        return source.where((p) => p.mortgageEligible).toList();
       default:
-        return all;
+        return List<Property>.from(source);
     }
   }
 
@@ -110,14 +113,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final l10n = AppLocalizations.of(context);
-    final properties = _filteredProperties();
-    final heroProperty = properties.isNotEmpty ? properties.first : MockData.properties.first;
-    final modernList = MockData.properties.where((p) => p.tags.contains('modern')).toList();
-    final cityList = MockData.properties
-        .where((p) => p.tags.contains('cityscape') || p.tags.contains('skyline'))
-        .toList();
-    final curatedModern = modernList.isEmpty ? MockData.properties : modernList;
-    final curatedCity = cityList.isEmpty ? MockData.properties : cityList;
 
     return Scaffold(
       appBar: AppBar(
@@ -222,13 +217,29 @@ class _HomePageState extends State<HomePage> {
         },
         child: const Icon(Icons.apps),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await scope.catalogNotifier.refresh();
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
+      body: AnimatedBuilder(
+        animation: scope.catalogNotifier,
+        builder: (context, _) {
+          final catalog = scope.catalogNotifier;
+          final catalogAll = catalog.allProperties;
+          final fallbackAll = catalogAll.isNotEmpty ? catalogAll : MockData.properties;
+          final primaryList = catalog.visible.isNotEmpty ? catalog.visible : fallbackAll;
+          final filtered = _filteredProperties(primaryList);
+          final heroProperty = filtered.isNotEmpty ? filtered.first : fallbackAll.first;
+          final modernCandidates = fallbackAll.where((p) => p.tags.contains('modern')).toList();
+          final modernSource = modernCandidates.isEmpty ? fallbackAll : modernCandidates;
+          final cityCandidates = fallbackAll
+              .where((p) => p.tags.contains('cityscape') || p.tags.contains('skyline'))
+              .toList();
+          final citySource = cityCandidates.isEmpty ? fallbackAll : cityCandidates;
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              await catalog.refresh();
+            },
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
             Container(
               key: _searchKey,
               child: AnimatedBuilder(
@@ -248,6 +259,15 @@ class _HomePageState extends State<HomePage> {
                   );
                 },
               ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: catalog.isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : const SizedBox.shrink(),
             ),
             AnimatedBuilder(
               animation: scope.searchNotifier,
@@ -324,9 +344,9 @@ class _HomePageState extends State<HomePage> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                itemCount: curatedModern.length,
+                itemCount: modernSource.length,
                 itemBuilder: (context, index) {
-                  final property = curatedModern[index];
+                  final property = modernSource[index];
                   return SizedBox(
                     width: 280,
                     child: PropertyCard(
@@ -350,9 +370,9 @@ class _HomePageState extends State<HomePage> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                itemCount: curatedCity.length,
+                itemCount: citySource.length,
                 itemBuilder: (context, index) {
-                  final property = curatedCity[index];
+                  final property = citySource[index];
                   return GestureDetector(
                     onTap: () => _openProperty(scope, property.id),
                     child: ClipRRect(
@@ -408,6 +428,8 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
+          );
+        },
       ),
       bottomNavigationBar: AnimatedBuilder(
         animation: scope.compareNotifier,

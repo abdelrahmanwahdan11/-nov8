@@ -223,13 +223,16 @@ class _BookingPageState extends State<BookingPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: booking.selectedSlot == null
-                        ? null
-                        : () {
-                            final slotText = l10n.t('booking_slot_label').replaceFirst('%s', booking.selectedSlot!);
-                            final message = '${l10n.t('booking_saved')} · $rangeSummary • $slotText';
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-                          },
+                    onPressed: () {
+                      if (booking.selectedSlot == null) {
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(l10n.t('booking_select_slot'))));
+                        return;
+                      }
+                      final slotText = l10n.t('booking_slot_label').replaceFirst('%s', booking.selectedSlot!);
+                      final message = '${l10n.t('booking_saved')} · $rangeSummary • $slotText';
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                    },
                     child: Text(l10n.t('confirm_booking')),
                   ),
                 ),

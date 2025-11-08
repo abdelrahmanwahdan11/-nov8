@@ -71,6 +71,7 @@ class CatalogNotifier extends ChangeNotifier {
   bool _isLoading = false;
 
   List<Property> get visible => _visible;
+  List<Property> get allProperties => List<Property>.unmodifiable(_all);
   bool get isLoading => _isLoading;
   int get currentPage => _currentPage;
   int get totalPages => (_filtered.length / _pageSize).ceil().clamp(1, 999);
