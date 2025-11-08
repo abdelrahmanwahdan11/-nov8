@@ -164,6 +164,24 @@ class CatalogNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  void ensureSeeded() {
+    var didChange = false;
+    if (_all.isEmpty) {
+      _all = List<Property>.from(MockData.properties);
+      didChange = true;
+    }
+    if (_filtered.isEmpty && MockData.properties.isNotEmpty) {
+      _applyPage(1);
+      didChange = true;
+    } else if (_visible.isEmpty && _all.isNotEmpty) {
+      _applyPage(1);
+      didChange = true;
+    }
+    if (didChange) {
+      notifyListeners();
+    }
+  }
+
   int get activeFiltersCount {
     var count = filters.tags.length;
     if (filters.city != null) count += 1;

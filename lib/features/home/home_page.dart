@@ -24,6 +24,16 @@ class _HomePageState extends State<HomePage> {
   String _selectedChip = 'all';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final scope = AppScope.of(context);
+      scope.catalogNotifier.ensureSeeded();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -192,6 +202,7 @@ class _HomePageState extends State<HomePage> {
               await catalog.refresh();
             },
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(24),
               children: [
             Container(
