@@ -16,6 +16,21 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _password = TextEditingController();
   bool _obscure = true;
   bool _remember = false;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    final scope = AppScope.of(context);
+    _remember = scope.preferencesService.loadRememberMe();
+    final savedEmail = scope.preferencesService.loadRememberedEmail() ??
+        scope.authNotifier.user?.email;
+    if (savedEmail != null) {
+      _email.text = savedEmail;
+    }
+    _initialized = true;
+  }
 
   @override
   void dispose() {
@@ -27,7 +42,15 @@ class _LoginPageState extends State<LoginPage> {
   void _submit() {
     if (_formKey.currentState?.validate() ?? false) {
       final scope = AppScope.of(context);
-      scope.authNotifier.login(_email.text);
+      final messenger = ScaffoldMessenger.of(context);
+      final l10n = AppLocalizations.of(context);
+      scope.authNotifier.login(_email.text, name: scope.authNotifier.user?.name);
+      if (_remember) {
+        scope.preferencesService.rememberLogin(_email.text);
+      } else {
+        scope.preferencesService.clearRememberedLogin();
+      }
+      messenger.showSnackBar(SnackBar(content: Text(l10n.t('login_success'))));
       Navigator.of(context).pushReplacementNamed('/home');
     }
   }
@@ -35,6 +58,10 @@ class _LoginPageState extends State<LoginPage> {
   void _guest() {
     final scope = AppScope.of(context);
     scope.authNotifier.guest();
+    scope.preferencesService.clearRememberedLogin();
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l10n.t('guest_mode_active'))));
     Navigator.of(context).pushReplacementNamed('/home');
   }
 

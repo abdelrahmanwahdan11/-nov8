@@ -51,7 +51,10 @@ class _SignupPageState extends State<SignupPage> {
   void _submit() {
     if (_formKey.currentState?.validate() ?? false) {
       final scope = AppScope.of(context);
-      scope.authNotifier.login(_email.text);
+      scope.authNotifier.login(_email.text, name: _name.text);
+      final l10n = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.t('login_success'))));
       Navigator.of(context).pushReplacementNamed('/home');
     }
   }

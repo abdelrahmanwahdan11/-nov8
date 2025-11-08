@@ -15,6 +15,11 @@ class PreferencesService {
   static const keyMyItems = 'my_items_cache';
   static const keyRecentSearches = 'recent_searches';
   static const keyLastBookingDate = 'last_booking';
+  static const keyRememberEmail = 'remember_email';
+  static const keyRememberFlag = 'remember_flag';
+  static const keyAuthEmail = 'auth_email';
+  static const keyAuthName = 'auth_name';
+  static const keyAuthGuest = 'auth_guest';
 
   Future<void> saveLocale(Locale locale) async {
     await _prefs.setString(keyLocale, locale.languageCode);
@@ -82,7 +87,54 @@ class PreferencesService {
     return DateTime.tryParse(value);
   }
 
+  Future<void> rememberLogin(String email) async {
+    await _prefs.setString(keyRememberEmail, email);
+    await _prefs.setBool(keyRememberFlag, true);
+  }
+
+  Future<void> clearRememberedLogin() async {
+    await _prefs.remove(keyRememberEmail);
+    await _prefs.remove(keyRememberFlag);
+  }
+
+  String? loadRememberedEmail() => _prefs.getString(keyRememberEmail);
+
+  bool loadRememberMe() => _prefs.getBool(keyRememberFlag) ?? false;
+
+  Future<void> saveAuthState({String? name, String? email, required bool isGuest}) async {
+    await _prefs.setBool(keyAuthGuest, isGuest);
+    if (email != null && !isGuest) {
+      await _prefs.setString(keyAuthEmail, email);
+    } else {
+      await _prefs.remove(keyAuthEmail);
+    }
+    if (name != null && !isGuest) {
+      await _prefs.setString(keyAuthName, name);
+    } else {
+      await _prefs.remove(keyAuthName);
+    }
+  }
+
+  StoredAuthState loadAuthState() {
+    final isGuest = _prefs.getBool(keyAuthGuest) ?? false;
+    final email = _prefs.getString(keyAuthEmail);
+    final name = _prefs.getString(keyAuthName);
+    return StoredAuthState(
+      name: name,
+      email: isGuest ? null : email,
+      isGuest: isGuest,
+    );
+  }
+
   Future<void> clearAll() async {
     await _prefs.clear();
   }
+}
+
+class StoredAuthState {
+  const StoredAuthState({this.name, this.email, required this.isGuest});
+
+  final String? name;
+  final String? email;
+  final bool isGuest;
 }

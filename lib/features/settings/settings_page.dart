@@ -53,6 +53,16 @@ class SettingsPage extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.t('clear_data'))));
             },
           ),
+          ListTile(
+            title: Text(l10n.t('logout')),
+            onTap: () {
+              scope.authNotifier.logout();
+              scope.preferencesService.clearRememberedLogin();
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(l10n.t('logout_success'))));
+              Navigator.of(context).pushNamedAndRemoveUntil('/auth/login', (route) => false);
+            },
+          ),
         ],
       ),
     );

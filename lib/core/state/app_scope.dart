@@ -49,7 +49,14 @@ class _AppScopeState extends State<AppScope> {
     final items = ItemsNotifier(items: ItemsNotifier.fromJson(service.loadMyItems()));
     final coach = CoachMarksNotifier(isFirstRun: service.isFirstRun());
     final search = SearchNotifier(initialRecent: service.loadRecentSearches());
-    final auth = AuthNotifier(isGuest: false);
+    final storedAuth = service.loadAuthState();
+    final storedUser = storedAuth.email != null
+        ? AuthUser(name: storedAuth.name ?? 'Explorer', email: storedAuth.email!)
+        : null;
+    final auth = AuthNotifier(
+      user: storedAuth.isGuest ? null : storedUser,
+      isGuest: storedAuth.isGuest,
+    );
 
     themeNotifier.addListener(() {
       service.saveDarkMode(themeNotifier.isDarkMode);
@@ -77,6 +84,14 @@ class _AppScopeState extends State<AppScope> {
     });
     items.addListener(() {
       service.saveMyItems(items.toJson());
+    });
+    auth.addListener(() {
+      final user = auth.user;
+      service.saveAuthState(
+        name: user?.name,
+        email: user?.email,
+        isGuest: auth.isGuest,
+      );
     });
 
     data = AppScopeData(
