@@ -175,6 +175,7 @@ class _HomePageState extends State<HomePage> {
         animation: scope.catalogNotifier,
         builder: (context, _) {
           final catalog = scope.catalogNotifier;
+          catalog.ensureSeeded();
           final catalogAll = catalog.allProperties;
           final fallbackAll = catalogAll.isNotEmpty ? catalogAll : MockData.properties;
           if (fallbackAll.isEmpty) {

@@ -151,7 +151,11 @@ class CatalogNotifier extends ChangeNotifier {
     _currentPage = page;
     final filtered = _filtered;
     final endIndex = (_currentPage * _pageSize).clamp(0, filtered.length);
-    _visible = filtered.take(endIndex).toList();
+    if (filtered.isEmpty && filters.isEmpty && MockData.properties.isNotEmpty) {
+      _visible = List<Property>.from(MockData.properties);
+    } else {
+      _visible = filtered.take(endIndex).toList();
+    }
   }
 
   void reset() {
