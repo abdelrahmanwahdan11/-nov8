@@ -15,7 +15,20 @@ class ItemsNotifier extends ChangeNotifier {
   final List<Offer> _offers;
 
   List<MyItem> get myItems => List.unmodifiable(_myItems);
-  List<Offer> get offers => List.unmodifiable(_offers);
+
+  List<Offer> get offers {
+    final sorted = List<Offer>.from(_offers)
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return List.unmodifiable(sorted);
+  }
+
+  int pendingOffersCount() =>
+      _offers.where((offer) => offer.status == OfferStatus.pending).length;
+
+  List<Offer> offersForItem(String itemId) => offers.where((offer) => offer.itemId == itemId).toList();
+
+  int pendingOffersFor(String itemId) =>
+      _offers.where((offer) => offer.itemId == itemId && offer.status == OfferStatus.pending).length;
 
   void add(MyItem item) {
     _myItems.add(item);
@@ -33,6 +46,24 @@ class ItemsNotifier extends ChangeNotifier {
       _myItems[index] = item;
       notifyListeners();
     }
+  }
+
+  void respondToOffer({
+    required String offerId,
+    required OfferStatus status,
+    double? counterAmount,
+    String? note,
+  }) {
+    final index = _offers.indexWhere((offer) => offer.id == offerId);
+    if (index == -1) return;
+    final updated = _offers[index].copyWith(
+      status: status,
+      counterAmount: counterAmount,
+      responseNote: note,
+      updatedAt: DateTime.now(),
+    );
+    _offers[index] = updated;
+    notifyListeners();
   }
 
   String toJson() {

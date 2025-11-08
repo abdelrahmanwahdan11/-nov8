@@ -122,6 +122,24 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
+          AnimatedBuilder(
+            animation: scope.itemsNotifier,
+            builder: (context, _) {
+              final pending = scope.itemsNotifier.pendingOffersCount();
+              return _buildBadgeIcon(
+                context,
+                icon: Icons.mark_unread_chat_alt_outlined,
+                count: pending,
+                tooltip: l10n.t('offers_pending_section'),
+                onTap: () => Navigator.of(context).pushNamed('/wanted'),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(IconlyLight.notification),
+            tooltip: l10n.t('notifications'),
+            onPressed: () => Navigator.of(context).pushNamed('/notifications'),
+          ),
           IconButton(
             icon: const Icon(IconlyLight.setting),
             onPressed: () => Navigator.of(context).pushNamed('/settings'),
@@ -367,4 +385,40 @@ class _FeatureChips extends StatelessWidget {
           .toList(),
     );
   }
+}
+
+Widget _buildBadgeIcon(
+  BuildContext context, {
+  required IconData icon,
+  required int count,
+  required String tooltip,
+  required VoidCallback onTap,
+}) {
+  final theme = Theme.of(context);
+  return Stack(
+    clipBehavior: Clip.none,
+    children: [
+      IconButton(
+        icon: Icon(icon),
+        tooltip: tooltip,
+        onPressed: onTap,
+      ),
+      if (count > 0)
+        Positioned(
+          right: 4,
+          top: 6,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              count > 9 ? '9+' : count.toString(),
+              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onPrimary),
+            ),
+          ),
+        ),
+    ],
+  );
 }

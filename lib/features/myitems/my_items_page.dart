@@ -60,6 +60,8 @@ class _MyItemsPageState extends State<MyItemsPage> {
             itemCount: notifier.myItems.length,
             itemBuilder: (context, index) {
               final item = notifier.myItems[index];
+              final offers = notifier.offersForItem(item.id);
+              final pending = notifier.pendingOffersFor(item.id);
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -104,6 +106,33 @@ class _MyItemsPageState extends State<MyItemsPage> {
                       Text('${l10n.t('tips')}: ${item.tips.join(', ')}'),
                       const SizedBox(height: 8),
                       Text('${l10n.t('status_label')}: ${_statusLabel(l10n, item.status)}'),
+                      if (offers.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Chip(
+                                label: Text(
+                                  l10n
+                                      .t('offers_received_count')
+                                      .replaceFirst('%d', offers.length.toString()),
+                                ),
+                              ),
+                              if (pending > 0)
+                                Chip(
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                                  label: Text(
+                                    l10n
+                                        .t('pending_offers_count')
+                                        .replaceFirst('%d', pending.toString()),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       if (item.wantedPrice != null)
                         Text('${l10n.t('wanted_price')}: ${AppFormatters.currency(item.wantedPrice!)}'),
                     ],
